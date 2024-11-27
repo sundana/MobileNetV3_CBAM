@@ -176,3 +176,48 @@ def save_model(model, optimizer, num_epochs, final_loss):
         'loss': final_loss,  # Replace final_loss with your final loss value
     }
     torch.save(checkpoint, f'J:\\tesis\\checkpoints\\{dt_string.replace("/", "-").replace(":", "-")}.pth')
+
+
+
+def calculate_inference_time(model, test_loader, device="cuda"):
+    """
+    Calculate the inference time of a PyTorch model.
+
+    Parameters:
+    - model: torch.nn.Module, the PyTorch model to evaluate
+    - input_tensor: torch.Tensor, a sample input tensor matching the model's input shape
+    - device: str, device to run the inference ('cuda' or 'cpu')
+
+    Returns:
+    - float, average inference time in milliseconds
+    """
+   
+    if torch.cuda.is_available():
+        device = device
+    elif torch.backends.mps.is_available():
+        device = "mps"
+    else:
+        device = "cpu"
+
+    model = model.to(device)
+
+    model.eval()
+    # Warm-up runs to stabilize CUDA performance
+    with torch.no_grad():
+        for inputs, _ in test_loader:
+            inputs = inputs.to(device)
+            _ = model(inputs)
+            break  # Run warm-up on just one batch
+
+     # Measure inference time across the dataset
+    times = []
+    with torch.no_grad():
+        for inputs, _ in test_loader:
+            inputs = inputs.to(device)
+            start_time = time.time()
+            _ = model(inputs)
+            end_time = time.time()
+            times.append((end_time - start_time) * 1000)  # Convert to milliseconds
+    
+    # Return the average inference time per batch
+    return sum(times) / len(times)
