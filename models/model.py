@@ -19,7 +19,8 @@ class FireModule(nn.Module):
 
 
 
-class ProposedModel(nn.Module):
+class ModelV1(nn.Module):
     def __init__(self):
         super().__init__()
+        
         

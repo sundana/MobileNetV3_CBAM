@@ -18,6 +18,8 @@ def train_model(model, train_loader, val_loader, num_epochs, criterion, optimize
         "val_accuracy": [],
     }
 
+    model.to(device)
+    
     for epoch in range(num_epochs):
         # Training phase
         model.train()
@@ -112,7 +114,7 @@ def plot_training_history(history):
 
 
 
-def evaluate_model(model, criterion, test_loader, class_names, device="cuda"):
+def evaluate_model(model, criterion, test_loader, class_names, device="mpu"):
   model = model.to(device)
   model.eval()
   all_preds = []
