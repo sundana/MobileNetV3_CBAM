@@ -179,7 +179,7 @@ def save_model(model, optimizer, num_epochs, final_loss):
 
 
 
-def calculate_inference_time(model, test_loader, device="cuda"):
+def calculate_inference_time(model, test_loader, device="cpu"):
     """
     Calculate the inference time of a PyTorch model.
 
@@ -192,12 +192,12 @@ def calculate_inference_time(model, test_loader, device="cuda"):
     - float, average inference time in milliseconds
     """
    
-    if torch.cuda.is_available():
-        device = device
-    elif torch.backends.mps.is_available():
-        device = "mps"
-    else:
-        device = "cpu"
+    # if torch.cuda.is_available():
+    #     device = device
+    # elif torch.backends.mps.is_available():
+    #     device = "mps"
+    # else:
+    #     device = "cpu"
 
     model = model.to(device)
 
