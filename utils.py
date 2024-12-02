@@ -181,6 +181,7 @@ def plot_training_history(history):
     plt.figure(figsize=(10, 5))
     plt.plot(epochs, history["train_accuracy"], label="Training Accuracy")
     plt.plot(epochs, history["val_accuracy"], label="Validation Accuracy")
+    plt.ylim(0, 100)
     plt.xlabel("Epochs")
     plt.ylabel("Accuracy (%)")
     plt.title("Training and Validation Accuracy")
