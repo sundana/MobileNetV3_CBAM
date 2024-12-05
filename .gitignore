@@ -1,5 +1,6 @@
 /Plant_leave_diseases_dataset_with_augmentation
 /data
+.env
 
 # Jupyter Notebook
 .ipynb_checkpoints
