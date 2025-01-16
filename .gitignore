@@ -1,9 +1,13 @@
 /Plant_leave_diseases_dataset_with_augmentation
 /data
+/penulisan
 .env
 
 # Jupyter Notebook
 .ipynb_checkpoints
+
+# MacOS unique dotfile
+.DS_Store
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
