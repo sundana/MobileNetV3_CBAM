@@ -13,18 +13,14 @@ def create_dataloader(
     batch_size: int,
     num_workers: int = NUM_WORKERS
 ):
-    # Load the dataset with ImageFolder
     dataset = datasets.ImageFolder(root=data_path, transform=transform)
 
-    # Set your desired split sizes
     train_size = int(0.7 * len(dataset))  # 70% for training
     val_size = int(0.15 * len(dataset))   # 15% for validation
     test_size = len(dataset) - train_size - val_size  # Remaining 15% for testing
 
-    # Split the dataset
     train_dataset, val_dataset, test_dataset = random_split(dataset, [train_size, val_size, test_size])
 
-    # Create DataLoaders for each set
     train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
     val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
     test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)

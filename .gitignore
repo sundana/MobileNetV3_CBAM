@@ -2,9 +2,11 @@
 /data
 /penulisan
 .env
+/checkpoints
 
 # Jupyter Notebook
 .ipynb_checkpoints
+**.ipynb
 
 # MacOS unique dotfile
 .DS_Store
