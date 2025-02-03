@@ -157,7 +157,6 @@ def train_model(model, train_loader, val_loader, num_epochs, criterion, optimize
     end_time = time.time()
     total_time = end_time - start_time
     print(f"Training completed in: {total_time // 60:.0f}m {total_time % 60:.0f}s")
-Model name
     return history
 
 
