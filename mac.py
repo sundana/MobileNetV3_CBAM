@@ -13,19 +13,17 @@ def calculate_layer_mac(layer, input_shape):
         float: The MAC value for the given layer.
     """
     if not isinstance(layer, nn.Conv2d):
-        return 0  # Skip non-convolutional layers
+        return 0  
 
     Cin, H, W = input_shape
     Cout = layer.out_channels
-    kernel_size = layer.kernel_size[0]  # Assuming square kernels
+    kernel_size = layer.kernel_size[0]  
 
-    # Calculate output spatial dimensions after the convolution
     stride = layer.stride[0]
     padding = layer.padding[0]
     H_out = (H + 2 * padding - kernel_size) // stride + 1
     W_out = (W + 2 * padding - kernel_size) // stride + 1
 
-    # Calculate MAC
     feature_maps_memory = H_out * W_out * (Cin + Cout)
     weights_memory = kernel_size * kernel_size * (Cin * Cout)
     mac = feature_maps_memory + weights_memory
@@ -47,11 +45,11 @@ def calculate_total_mac(model, input_shape):
     current_shape = input_shape
 
     for layer in model.children():
-        if isinstance(layer, nn.Sequential):  # Handle nested layers
+        if isinstance(layer, nn.Sequential):  
             total_mac += calculate_total_mac(layer, current_shape)
         else:
             mac, output_shape = calculate_layer_mac(layer, current_shape)
             total_mac += mac
-            current_shape = output_shape  # Update the input shape for the next layer
+            current_shape = output_shape  
 
     return total_mac

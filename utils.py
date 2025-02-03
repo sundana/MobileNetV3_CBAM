@@ -7,7 +7,6 @@ from sklearn.metrics import confusion_matrix, accuracy_score, precision_score, r
 from datetime import datetime
 import os
 
-
 # Define EarlyStopping class with checkpoint saving
 class EarlyStopping:
     def __init__(self, patience=5, delta=0, save_best_model=True, checkpoint_dir='checkpoints'):
@@ -158,7 +157,7 @@ def train_model(model, train_loader, val_loader, num_epochs, criterion, optimize
     end_time = time.time()
     total_time = end_time - start_time
     print(f"Training completed in: {total_time // 60:.0f}m {total_time % 60:.0f}s")
-
+Model name
     return history
 
 
