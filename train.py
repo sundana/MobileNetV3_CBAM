@@ -7,11 +7,9 @@ import os
 import argparse
 from utils import plot_training_history, train_model
 from dotenv import load_dotenv
-
-
-
-load_dotenv()
-data_path = os.environ.get('DATA_PATH')
+from data_setup import create_dataloader
+from torchvision import transforms
+from evaluations import measure_throughput_latency
 
 class EarlyStopping:
     def __init__(self, patience=5, delta=0, save_best_model=True, checkpoint_dir='checkpoints'):
@@ -161,4 +159,37 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
 
-    train_model(args.model, )
+    model = args.model
+    num_epochs = int(args.epoch)
+    device = args.device
+
+    load_dotenv()
+    data_path = os.environ.get('DATA_PATH')
+
+    transform = transforms.Compose([
+        transforms.Resize((224, 224)),  # Resize images to 224x224 (or the input size for your model)
+        transforms.ToTensor(),
+        # transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225])  # Standard normalization
+    ])
+
+    train_loader, val_loader, test_loader, class_names = create_dataloader(
+        data_path = data_path,
+        transform = transform,
+        batch_size = 64,
+    )
+
+    num_classes = len(class_names)
+
+    if model == "proposed_model_large":
+        from my_models.mobilenetv3 import MobileNetV3_Large
+        model = MobileNetV3_Large(num_classes=num_classes)
+    elif model == "proposed_model_small":
+        from my_models.mobilenetv3 import MobileNetV3_Small
+        model = MobileNetV3_Small(num_classes=num_classes)
+    criterion = torch.nn.CrossEntropyLoss()
+    optimizer = torch.optim.Adam(model.parameters(), lr=0.001)
+
+    history = train_model(model, train_loader, val_loader, num_epochs, criterion, optimizer, device=device)
+    plot_training_history(history, save_dir='plots')
+
+    

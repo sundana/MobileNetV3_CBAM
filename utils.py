@@ -161,7 +161,7 @@ def train_model(model, train_loader, val_loader, num_epochs, criterion, optimize
 
 
 
-def plot_training_history(history):
+def plot_training_history(history, save_dir=None, model_name=None):
     epochs = range(1, len(history["train_loss"]) + 1)
 
     # Plotting training and validation loss
@@ -173,6 +173,9 @@ def plot_training_history(history):
     plt.title("Training and Validation Loss")
     plt.legend()
     plt.grid()
+    if save_dir:
+        os.makedirs(save_dir, exist_ok=True)
+        plt.savefig(os.path.join(save_dir, f"training_validation_loss_{model_name.__class__.__name__}.png"))
     plt.show()
 
     # Plotting training and validation accuracy
@@ -185,6 +188,8 @@ def plot_training_history(history):
     plt.title("Training and Validation Accuracy")
     plt.legend()
     plt.grid()
+    if save_dir:
+        plt.savefig(os.path.join(save_dir, f"training_validation_accuracy_{model_name.__class__.__name__}.png"))
     plt.show()
 
 
