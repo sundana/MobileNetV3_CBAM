@@ -145,7 +145,7 @@ class MobileNetV3_Large(nn.Module):
         out = self.hs1(self.bn1(self.conv1(x)))
         out = self.bneck(out)
         out = self.hs2(self.bn2(self.conv2(out)))
-        out = F.adaptive_avg_pool2d(out, 7)
+        out = F.avg_pool2d(out, 7)
         out = out.view(out.size(0), -1)
         out = self.hs3(self.bn3(self.linear3(out)))
         out = self.linear4(out)

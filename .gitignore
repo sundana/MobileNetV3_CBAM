@@ -3,6 +3,7 @@
 /penulisan
 .env
 /checkpoints
+/plots
 
 # Jupyter Notebook
 .ipynb_checkpoints
