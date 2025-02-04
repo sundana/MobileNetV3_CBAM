@@ -7,7 +7,18 @@ from torchvision import transforms
 from data_setup import create_dataloader
 import os
 from dotenv import load_dotenv
+import argparse
 
+
+parser = argparse.ArgumentParser()
+parser.add_argument("-m", "--model", help="Model name")
+parser.add_argument("-e", "--epoch", help="Num. of epoch")
+parser.add_argument("-d", "--device", help="Device")
+
+args = parser.parse_args()
+
+model = args.model
+device = args.device
 
 load_dotenv()
 data_path = os.environ.get('DATA_PATH')
@@ -26,16 +37,23 @@ train_loader, val_loader, test_loader, class_names = create_dataloader(
 
 num_classes = len(class_names)
 
-loaded_mobilenetv3_cbam_large = MobileNetV3WithCBAM(mode='large', num_classes=num_classes)
-loaded_mobilenetv3_cbam_large.load_state_dict(torch.load(f='/Users/firmansyahsundana/Documents/Study/computer science/tesis/code/checkpoints/proposed_model_large.pth', map_location="mps"))
+match model:
+    case "proposed_model_large":
+        from my_models.mobilenetv3 import MobileNetV3_Large
+        model = MobileNetV3_Large(num_classes=num_classes)
+        model.load_state_dict(torch.load(f='/Users/firmansyahsundana/Documents/Study/computer science/tesis/code/checkpoints/proposed_model_large.pth', map_location=device))
+    case "proposed_model_small":
+        from my_models.mobilenetv3 import MobileNetV3_Small
+        model = MobileNetV3_Small(num_classes=num_classes)
+        model.load_state_dict(torch.load(f='/Users/firmansyahsundana/Documents/Study/computer science/tesis/code/checkpoints/proposed_model_small.pth', map_location=device))
 
 criterion = nn.CrossEntropyLoss()
-optimizer = optim.Adam(mobilenetv3_cbam_large.parameters(), lr=0.001)
+optimizer = optim.Adam(model.parameters(), lr=0.001)
 
-cm, performance_table, final_loss = evaluate_model(loaded_mobilenetv3_cbam_large, criterion, test_loader, class_names, device=device)
+cm, performance_table, final_loss = evaluate_model(model, criterion, test_loader, class_names, device=device)
 from evaluations import measure_throughput_latency
 
-avg_latency, throughput = measure_throughput_latency(loaded_mobilenetv3_cbam_large, test_loader, device='cpu')
+avg_latency, throughput = measure_throughput_latency(model, test_loader, device=device)
 
 print(f"Average Latency: {avg_latency:.4f} seconds per batch")
 print(f"Throughput: {throughput:.2f} samples per second")
