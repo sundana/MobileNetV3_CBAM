@@ -12,12 +12,13 @@ import argparse
 
 parser = argparse.ArgumentParser()
 parser.add_argument("-m", "--model", help="Model name")
-parser.add_argument("-e", "--epoch", help="Num. of epoch")
+parser.add_argument("-w", "--weight", help="Model weight")
 parser.add_argument("-d", "--device", help="Device")
 
 args = parser.parse_args()
 
 model = args.model
+weight = args.weight
 device = args.device
 
 load_dotenv()
@@ -41,11 +42,11 @@ match model:
     case "proposed_model_large":
         from my_models.mobilenetv3 import MobileNetV3_Large
         model = MobileNetV3_Large(num_classes=num_classes)
-        model.load_state_dict(torch.load(f='/Users/firmansyahsundana/Documents/Study/computer science/tesis/code/checkpoints/proposed_model_large.pth', map_location=device))
+        model.load_state_dict(torch.load(f=f'/Users/firmansyahsundana/Documents/Study/computer science/tesis/code/checkpoints/{weight}.pth', map_location=device))
     case "proposed_model_small":
         from my_models.mobilenetv3 import MobileNetV3_Small
         model = MobileNetV3_Small(num_classes=num_classes)
-        model.load_state_dict(torch.load(f='/Users/firmansyahsundana/Documents/Study/computer science/tesis/code/checkpoints/proposed_model_small.pth', map_location=device))
+        model.load_state_dict(torch.load(f=f'/Users/firmansyahsundana/Documents/Study/computer science/tesis/code/checkpoints/{weight}.pth', map_location=device))
 
 criterion = nn.CrossEntropyLoss()
 optimizer = optim.Adam(model.parameters(), lr=0.001)
