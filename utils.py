@@ -7,6 +7,7 @@ from sklearn.metrics import confusion_matrix, accuracy_score, precision_score, r
 from datetime import datetime
 import os
 
+
 # Define EarlyStopping class with checkpoint saving
 class EarlyStopping:
     def __init__(self, patience=5, delta=0, save_best_model=True, checkpoint_dir='checkpoints'):
@@ -157,11 +158,12 @@ def train_model(model, train_loader, val_loader, num_epochs, criterion, optimize
     end_time = time.time()
     total_time = end_time - start_time
     print(f"Training completed in: {total_time // 60:.0f}m {total_time % 60:.0f}s")
+
     return history
 
 
 
-def plot_training_history(history, save_dir=None, model_name=None):
+def plot_training_history(history):
     epochs = range(1, len(history["train_loss"]) + 1)
 
     # Plotting training and validation loss
@@ -173,9 +175,6 @@ def plot_training_history(history, save_dir=None, model_name=None):
     plt.title("Training and Validation Loss")
     plt.legend()
     plt.grid()
-    if save_dir:
-        os.makedirs(save_dir, exist_ok=True)
-        plt.savefig(os.path.join(save_dir, f"training_validation_loss_{model_name.__class__.__name__}.png"))
     plt.show()
 
     # Plotting training and validation accuracy
@@ -188,61 +187,173 @@ def plot_training_history(history, save_dir=None, model_name=None):
     plt.title("Training and Validation Accuracy")
     plt.legend()
     plt.grid()
-    if save_dir:
-        plt.savefig(os.path.join(save_dir, f"training_validation_accuracy_{model_name.__class__.__name__}.png"))
     plt.show()
 
 
 
-def evaluate_model(model, criterion, test_loader, class_names, device="mpu"):
-  model = model.to(device)
-  model.eval()
-  all_preds = []
-  all_labels = []
+def evaluate_model(model, criterion, test_loader, class_names, device, results_dir="./results"):
+    """
+    Evaluate the model on the test dataset and calculate performance metrics.
 
-  total_loss = 0.0
-  with torch.no_grad():
-    for inputs, labels in test_loader:
-      inputs, labels = inputs.to(device), labels.to(device)
-      outputs = model(inputs)
-      loss = criterion(outputs, labels)
-      _, preds = torch.max(outputs, 1)
-      all_preds.extend(preds.cpu().numpy())
-      all_labels.extend(labels.cpu().numpy())
-      total_loss += loss.item() * inputs.size(0)
+    Args:
+        model (torch.nn.Module): The model to evaluate.
+        criterion (torch.nn.Module): Loss function.
+        test_loader (DataLoader): DataLoader for the test dataset.
+        class_names (list): List of class names for the confusion matrix.
+        device (str): Device to run the evaluation on ('cuda' or 'cpu').
+        results_dir (str): Directory to save the confusion matrix plot.
 
-  # Calculate avg loss
-  final_loss = total_loss / len(test_loader)
-  print(f"Final Loss: {final_loss:.4f}")
+    Returns:
+        tuple: Confusion matrix, performance metrics table, and final loss.
+    """
+    start_time = time.time()
+    model = model.to(device)
+    model.eval()
 
-  cm = confusion_matrix(all_labels, all_preds)
-  accuracy = accuracy_score(all_labels, all_preds)
-  precision = precision_score(all_labels, all_preds, average='weighted')
-  recall = recall_score(all_labels, all_preds, average='weighted')
-  f1 = f1_score(all_labels, all_preds, average='weighted')
+    all_preds, all_labels = [], []
+    total_loss = 0.0
 
-  # Plot confusion matrix
-  plt.figure(figsize=(10, 8))
-  sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=class_names, yticklabels=class_names)
-  plt.xlabel('Predicted')
-  plt.ylabel('True')
-  plt.title('Confusion Matrix')
-  plt.show()
+    # Evaluate the model
+    with torch.no_grad():
+        for inputs, labels in test_loader:
+            inputs, labels = inputs.to(device), labels.to(device)
+            outputs = model(inputs)
+            loss = criterion(outputs, labels)
 
-  # Display performance matrix
-  print(f"Accuracy: {accuracy:.2f}")
-  print(f"Precision: {precision:.2f}")
-  print(f"Recall: {recall:.2f}")
-  print(f"F1 Score: {f1:.4f}")
+            _, preds = torch.max(outputs, 1)
+            all_preds.extend(preds.cpu().numpy())
+            all_labels.extend(labels.cpu().numpy())
+            total_loss += loss.item() * inputs.size(0)
 
-  # Create a table of performance metrics
-  performance_table = {
-      'Metric': ['Accuracy', 'Precision', 'Recall', 'F1 Score'],
-      'Value': [f"{accuracy:.2f}", f"{precision:.2f}", f"{recall:.2f}", f"{f1:.4f}"]
-  }
+    # Calculate average loss
+    final_loss = total_loss / len(test_loader.dataset)
+    print(f"Final Loss: {final_loss:.4f}")
 
-  return cm, performance_table, final_loss
+    # Calculate performance metrics
+    cm = confusion_matrix(all_labels, all_preds)
+    metrics = calculate_metrics(all_labels, all_preds)
 
+    # Plot and save confusion matrix
+    save_confusion_matrix(cm, class_names, model.__class__.__name__, results_dir)
+
+    # Display performance metrics
+    print_metrics(metrics)
+
+    end_time = time.time()
+    total_time = end_time - start_time
+    print(f"Inference completed in: {total_time // 60:.0f}m {total_time % 60:.0f}s")
+
+    return cm, metrics, final_loss
+
+
+def calculate_metrics(labels, preds):
+    """
+    Calculate evaluation metrics.
+
+    Args:
+        labels (list): True labels.
+        preds (list): Predicted labels.
+
+    Returns:
+        dict: Dictionary of evaluation metrics.
+    """
+    accuracy = accuracy_score(labels, preds)
+    precision = precision_score(labels, preds, average='weighted')
+    recall = recall_score(labels, preds, average='weighted')
+    f1 = f1_score(labels, preds, average='weighted')
+
+    return {
+        "Accuracy": accuracy,
+        "Precision": precision,
+        "Recall": recall,
+        "F1 Score": f1
+    }
+
+
+def save_confusion_matrix(cm, class_names, model_name, results_dir):
+    """
+    Save the confusion matrix as a heatmap, both overall and per-class.
+
+    Args:
+        cm (ndarray): Confusion matrix.
+        class_names (list): List of class names.
+        model_name (str): Name of the model.
+        results_dir (str): Directory to save the plot.
+    """
+    import os
+    import matplotlib.pyplot as plt
+    import seaborn as sns
+    import numpy as np
+    
+    # Ensure the results directory exists
+    os.makedirs(results_dir, exist_ok=True)
+    
+    # Save the overall confusion matrix
+    plt.figure(figsize=(10, 8))
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=class_names, yticklabels=class_names)
+    plt.xlabel('Predicted')
+    plt.ylabel('True')
+    plt.title('Confusion Matrix')
+    plot_path = os.path.join(results_dir, f"{model_name}_confusion_matrix.png")
+    plt.savefig(plot_path, bbox_inches="tight")
+    print(f"Overall confusion matrix saved to {plot_path}")
+    plt.close()
+    
+    # Create and save per-class confusion matrices
+    for i, class_name in enumerate(class_names):
+        # Create binary confusion matrix for this class
+        # True positives, false negatives
+        # False positives, true negatives
+        binary_cm = np.zeros((2, 2), dtype=int)
+        
+        # True positives (predicted as this class and is this class)
+        binary_cm[0, 0] = cm[i, i]
+        
+        # False negatives (predicted as another class but is this class)
+        binary_cm[0, 1] = np.sum(cm[i, :]) - cm[i, i]
+        
+        # False positives (predicted as this class but is another class)
+        binary_cm[1, 0] = np.sum(cm[:, i]) - cm[i, i]
+        
+        # True negatives (predicted as another class and is another class)
+        binary_cm[1, 1] = np.sum(cm) - binary_cm[0, 0] - binary_cm[0, 1] - binary_cm[1, 0]
+        
+        # Create the plot
+        plt.figure(figsize=(8, 6))
+        sns.heatmap(
+            binary_cm, 
+            annot=True, 
+            fmt='d', 
+            cmap='Blues',
+            xticklabels=['Predicted as ' + class_name, 'Predicted as others'],
+            yticklabels=['Actually ' + class_name, 'Actually others']
+        )
+        plt.title(f'Confusion Matrix for {class_name}')
+        
+        # Save the plot
+        class_plot_path = os.path.join(results_dir, f"{model_name}_confusion_matrix_{class_name.replace(' ', '_')}.png")
+        plt.savefig(class_plot_path, bbox_inches="tight")
+        print(f"Class confusion matrix saved to {class_plot_path}")
+        plt.close()
+    
+    # Display the overall confusion matrix when calling the function
+    plt.figure(figsize=(10, 8))
+    sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', xticklabels=class_names, yticklabels=class_names)
+    plt.xlabel('Predicted')
+    plt.ylabel('True')
+    plt.title('Confusion Matrix')
+    plt.show()
+
+
+def print_metrics(metrics):
+    """
+    Print evaluation metrics.
+
+    Args:
+        metrics (dict): Dictionary of evaluation metrics.
+    """
+    for metric, value in metrics.items():
+        print(f"{metric}: {value:.2f}")
 
 
 def save_model(model, optimizer, num_epochs, final_loss):
@@ -265,23 +376,15 @@ def calculate_inference_time(model, test_loader, device="cpu"):
 
     Parameters:
     - model: torch.nn.Module, the PyTorch model to evaluate
-    - input_tensor: torch.Tensor, a sample input tensor matching the model's input shape
+    - test_loader: DataLoader, the test dataset loader
     - device: str, device to run the inference ('cuda' or 'cpu')
 
     Returns:
     - float, average inference time in milliseconds
     """
-   
-    # if torch.cuda.is_available():
-    #     device = device
-    # elif torch.backends.mps.is_available():
-    #     device = "mps"
-    # else:
-    #     device = "cpu"
-
     model = model.to(device)
-
     model.eval()
+
     # Warm-up runs to stabilize CUDA performance
     with torch.no_grad():
         for inputs, _ in test_loader:
@@ -289,15 +392,59 @@ def calculate_inference_time(model, test_loader, device="cpu"):
             _ = model(inputs)
             break  # Run warm-up on just one batch
 
-     # Measure inference time across the dataset
+    # Measure inference time across the dataset with a progress bar
     times = []
     with torch.no_grad():
-        for inputs, _ in test_loader:
+        for inputs, _ in tqdm(test_loader, desc="Calculating Inference Time", unit="batch"):
             inputs = inputs.to(device)
             start_time = time.time()
             _ = model(inputs)
             end_time = time.time()
             times.append((end_time - start_time) * 1000)  # Convert to milliseconds
-    
+
     # Return the average inference time per batch
     return sum(times) / len(times)
+
+
+
+def export_confusion_matrix_to_csv(cm, class_names, save_path='./csv', filename='confusion_matrix.csv'):
+    """
+    Export a confusion matrix to a CSV file with proper row and column labels.
+    
+    Parameters:
+    -----------
+    cm : numpy.ndarray
+        The confusion matrix to export
+    class_names : list
+        List of class names for labeling rows and columns
+    save_path : str, optional
+        Directory path where the CSV file will be saved
+    filename : str, optional
+        Name of the CSV file
+        
+    Returns:
+    --------
+    str
+        Path to the saved CSV file
+    """
+    import os
+    import numpy as np
+    import pandas as pd
+    
+    # Ensure the save directory exists
+    os.makedirs(save_path, exist_ok=True)
+    
+    # Create a DataFrame with proper labeling
+    cm_df = pd.DataFrame(cm, index=class_names, columns=class_names)
+    
+    # Add row labels for clarity (actual classes)
+    cm_df.index.name = 'Actual'
+    
+    # Add a custom header for the first column (predicted classes)
+    full_path = os.path.join(save_path, filename)
+    
+    # Save to CSV
+    cm_df.to_csv(full_path)
+    print(f"Confusion matrix saved to {full_path}")
+    
+    return full_path
