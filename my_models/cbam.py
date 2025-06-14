@@ -5,15 +5,17 @@ import torch.nn as nn
 class ChannelAttention(nn.Module):
     def __init__(self, in_channels: int, reduction: int=16):
         super(ChannelAttention, self).__init__()
-        self.fc1 = nn.Conv2d(in_channels, in_channels // reduction, 1, bias=False)
-        self.relu = nn.ReLU(inplace=True)
-        self.fc2 = nn.Conv2d(in_channels // reduction, in_channels, 1, bias=False)
+        self.se = nn.Sequential(
+            nn.Conv2d(in_channels, in_channels // reduction, 1, bias=False),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(in_channels // reduction, in_channels, 1, bias=False),
+        )
 
     def forward(self, x):
         avg_pool = torch.mean(x, dim=(-2, -1), keepdim=True)  # Global Avg Pooling
         max_pool = torch.amax(x, dim=(-2, -1), keepdim=True)  # Global Max Pooling
-        out = self.fc1(avg_pool) + self.fc1(max_pool)
-        return torch.sigmoid(self.fc2(self.relu(out))) * x
+        out = self.se(avg_pool) + self.se(max_pool)
+        return torch.sigmoid(out) * x
 
 # Spatial Attention (SA)
 class SpatialAttention(nn.Module):
