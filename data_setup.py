@@ -1,6 +1,4 @@
 import os
-import random
-import requests
 
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader, random_split
@@ -21,10 +19,10 @@ def create_dataloader(
 
     train_dataset, val_dataset, test_dataset = random_split(dataset, [train_size, val_size, test_size])
 
-    train_loader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-    val_loader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
-    test_loader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
+    train_dataloader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
+    val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
+    test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
-    class_names = test_loader.dataset.dataset.classes
+    class_names = test_dataloader.dataset.dataset.classes
     
-    return train_loader, val_loader, test_loader, class_names
+    return train_dataloader, val_dataloader, test_dataloader, class_names
