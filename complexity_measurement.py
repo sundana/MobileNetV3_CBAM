@@ -28,7 +28,7 @@ def calculate_flops(models: list[nn.Module]) -> pd.DataFrame:
 
 
 if __name__ == "__main__":
-    from my_models import mobilenetv3, proposed_model
+    from models import mobilenetv3, proposed_model
     
     # Register model
     models = [ 

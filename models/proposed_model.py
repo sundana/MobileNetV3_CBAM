@@ -12,7 +12,7 @@ subsequently improved through novel architecture advances
 from torch import nn
 import torch.nn.functional as F
 from torch.nn import init
-from my_models.cbam import CBAM
+from models.cbam import CBAM
 
 class SELayer(nn.Module):
     def __init__(self, in_channel, hidden_channel):
