@@ -2,7 +2,15 @@ import torch.nn as nn
 from ptflops import get_model_complexity_info
 import pandas as pd
 
-def calculate_flops(models: list[nn.Module]) -> dict:
+def calculate_flops(models: list[nn.Module]) -> pd.DataFrame:
+    """Calculate model FLOPs
+
+    Args:
+        models (list(nn.Module)): PyTorch model based on nn.Module
+
+    Returns:
+        pd.DataFrame: table of model complexity
+    """
     model_complexity = {
         "models": [],
         "flops": [],
@@ -10,7 +18,7 @@ def calculate_flops(models: list[nn.Module]) -> dict:
     }
     for model in models:
         model = model(num_classes=29)
-        flop, params = get_model_complexity_info(model, (3, 224, 224), as_strings=True, print_per_layer_stat=False)
+        flop, params = get_model_complexity_info(model, (3, 224, 224), as_strings=False, print_per_layer_stat=False)
         model_complexity["models"].append(model.__class__.__name__)
         model_complexity["flops"].append(flop)
         model_complexity["params"].append(params)
@@ -21,7 +29,9 @@ def calculate_flops(models: list[nn.Module]) -> dict:
 
 if __name__ == "__main__":
     from my_models import mobilenetv3, proposed_model
-    models = [
+    
+    # Register model
+    models = [ 
         mobilenetv3.MobileNetV3_Large, 
         proposed_model.MobileNetV3_Large_CBAM_16,
         proposed_model.MobileNetV3_Large_CBAM_32,
@@ -29,6 +39,8 @@ if __name__ == "__main__":
         proposed_model.MobileNetV3_Small_CBAM_16,
         proposed_model.MobileNetV3_Small_CBAM_32,
     ]
-    complexity = calculate_flops(models)
 
-    print(complexity)
+    df = calculate_flops(models)
+    df.to_csv('./results/complexity/model_complexity.csv', index=False) # Save result csv
+    print("Saving model complexity completed to ./results/complexity")
+    print(df)
