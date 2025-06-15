@@ -9,7 +9,6 @@ subsequently improved through novel architecture advances
 """
 
 
-import torch
 from torch import nn
 import torch.nn.functional as F
 from torch.nn import init
@@ -93,9 +92,9 @@ class Block(nn.Module):
         return out
 
 
-class MobileNetV3_Large(nn.Module):
+class MobileNetV3_Large_CBAM_16(nn.Module):
     def __init__(self, num_classes=1000, reduction_ratio=16):
-        super(MobileNetV3_Large, self).__init__()
+        super(MobileNetV3_Large_CBAM_16, self).__init__()
         self.conv1 = nn.Conv2d(3, 16, kernel_size=3, stride=2, padding=1, bias=False)
         self.bn1 = nn.BatchNorm2d(16)
         self.hs1 = nn.Hardswish()
@@ -152,9 +151,68 @@ class MobileNetV3_Large(nn.Module):
         return out
     
 
-class MobileNetV3_Small(nn.Module):
+class MobileNetV3_Large_CBAM_32(nn.Module):
+    def __init__(self, num_classes=1000, reduction_ratio=32):
+        super(MobileNetV3_Large_CBAM_32, self).__init__()
+        self.conv1 = nn.Conv2d(3, 16, kernel_size=3, stride=2, padding=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(16)
+        self.hs1 = nn.Hardswish()
+
+        self.bneck = nn.Sequential(
+            Block(3, 16, 16, 16, nn.ReLU(inplace=True), None, 1),
+            Block(3, 16, 64, 24, nn.ReLU(inplace=True), None, 2),
+            Block(3, 24, 72, 24, nn.ReLU(inplace=True), None, 1),
+            Block(5, 24, 72, 40, nn.ReLU(inplace=True), CBAM(40, reduction_ratio), 2),
+            Block(5, 40, 120, 40, nn.ReLU(inplace=True), CBAM(40, reduction_ratio), 1),
+            Block(5, 40, 120, 40, nn.ReLU(inplace=True), CBAM(40, reduction_ratio), 1),
+            Block(3, 40, 240, 80, nn.Hardswish(), None, 2),
+            Block(3, 80, 200, 80, nn.Hardswish(), None, 1),
+            Block(3, 80, 184, 80, nn.Hardswish(), None, 1),
+            Block(3, 80, 184, 80, nn.Hardswish(), None, 1),
+            Block(3, 80, 480, 112, nn.Hardswish(), CBAM(112, reduction_ratio), 1),
+            Block(3, 112, 672, 112, nn.Hardswish(), CBAM(112, reduction_ratio), 1),
+            Block(5, 112, 672, 160, nn.Hardswish(), CBAM(160, reduction_ratio), 1),
+            Block(5, 160, 672, 160, nn.Hardswish(), CBAM(160, reduction_ratio), 2),
+            Block(5, 160, 960, 160, nn.Hardswish(), CBAM(160, reduction_ratio), 1),
+        )
+        
+        self.conv2 = nn.Conv2d(160, 960, kernel_size=1, stride=1, padding=0, bias=False)
+        self.bn2 = nn.BatchNorm2d(960)
+        self.hs2 = nn.Hardswish()
+        self.linear3 = nn.Linear(960, 1280)
+        self.bn3 = nn.BatchNorm1d(1280)
+        self.hs3 = nn.Hardswish()
+        self.linear4 = nn.Linear(1280, num_classes)
+        self.init_params()
+
+    def init_params(self):
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                init.kaiming_normal_(m.weight, mode='fan_out')
+                if m.bias is not None:
+                    init.constant_(m.bias, 0)
+            elif isinstance(m, nn.BatchNorm2d):
+                init.constant_(m.weight, 1)
+                init.constant_(m.bias, 0)
+            elif isinstance(m, nn.Linear):
+                init.normal_(m.weight, std=0.001)
+                if m.bias is not None:
+                    init.constant_(m.bias, 0)
+
+    def forward(self, x):
+        out = self.hs1(self.bn1(self.conv1(x)))
+        out = self.bneck(out)
+        out = self.hs2(self.bn2(self.conv2(out)))
+        out = F.avg_pool2d(out, 7)
+        out = out.view(out.size(0), -1)
+        out = self.hs3(self.bn3(self.linear3(out)))
+        out = self.linear4(out)
+        return out
+
+
+class MobileNetV3_Small_CBAM_16(nn.Module):
     def __init__(self, num_classes=1000, reduction_ratio=16):
-        super(MobileNetV3_Small, self).__init__()
+        super(MobileNetV3_Small_CBAM_16, self).__init__()
         self.conv1 = nn.Conv2d(3, 16, kernel_size=3, stride=2, padding=1, bias=False)
         self.bn1 = nn.BatchNorm2d(16)
         self.hs1 = nn.Hardswish()
@@ -208,9 +266,58 @@ class MobileNetV3_Small(nn.Module):
         return out
     
 
+class MobileNetV3_Small_CBAM_32(nn.Module):
+    def __init__(self, num_classes=1000, reduction_ratio=32):
+        super(MobileNetV3_Small_CBAM_32, self).__init__()
+        self.conv1 = nn.Conv2d(3, 16, kernel_size=3, stride=2, padding=1, bias=False)
+        self.bn1 = nn.BatchNorm2d(16)
+        self.hs1 = nn.Hardswish()
 
-def test():
-    net = MobileNetV3_Small()
-    x = torch.randn(1, 3, 224, 224)
-    y = net(x)
-    print(y.size())
+        self.bneck = nn.Sequential(
+            Block(3, 16, 16, 16, nn.ReLU(inplace=True), CBAM(16), 2),
+            Block(3, 16, 72, 24, nn.ReLU(inplace=True), None, 2),
+            Block(3, 24, 88, 24, nn.ReLU(inplace=True), None, 1),
+            Block(5, 24, 96, 40, nn.Hardswish(), CBAM(40, reduction_ratio), 2),
+            Block(5, 40, 240, 40, nn.Hardswish(), CBAM(40, reduction_ratio), 1),
+            Block(5, 40, 240, 40, nn.Hardswish(), CBAM(40, reduction_ratio), 1),
+            Block(5, 40, 120, 48, nn.Hardswish(), CBAM(48, reduction_ratio), 1),
+            Block(5, 48, 144, 48, nn.Hardswish(), CBAM(48, reduction_ratio), 1),
+            Block(5, 48, 288, 96, nn.Hardswish(), CBAM(96, reduction_ratio), 2),
+            Block(5, 96, 576, 96, nn.Hardswish(), CBAM(96, reduction_ratio), 1),
+            Block(5, 96, 576, 96, nn.Hardswish(), CBAM(96, reduction_ratio), 1),
+        )
+
+        self.conv2 = nn.Conv2d(96, 576, kernel_size=1, stride=1, padding=0, bias=False)
+        self.bn2 = nn.BatchNorm2d(576)
+        self.hs2 = nn.Hardswish()
+        self.linear3 = nn.Linear(576, 1280)
+        self.bn3 = nn.BatchNorm1d(1280)
+        self.hs3 = nn.Hardswish()
+        self.linear4 = nn.Linear(1280, num_classes)
+        self.init_params()
+
+    def init_params(self):
+        for m in self.modules():
+            if isinstance(m, nn.Conv2d):
+                init.kaiming_normal_(m.weight, mode='fan_out')
+                if m.bias is not None:
+                    init.constant_(m.bias, 0)
+            elif isinstance(m, nn.BatchNorm2d):
+                init.constant_(m.weight, 1)
+                init.constant_(m.bias, 0)
+            elif isinstance(m, nn.Linear):
+                init.normal_(m.weight, std=0.001)
+                if m.bias is not None:
+                    init.constant_(m.bias, 0)
+
+    
+    def forward(self, x):
+        out = self.hs1(self.bn1(self.conv1(x)))
+        out = self.bneck(out)
+        out = self.hs2(self.bn2(self.conv2(out)))
+        out = F.avg_pool2d(out, 7)
+        out = out.view(out.size(0), -1)
+        out = self.hs3(self.bn3(self.linear3(out)))
+        out = self.linear4(out)
+        return out
+
