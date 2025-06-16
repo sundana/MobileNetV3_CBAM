@@ -1,7 +1,10 @@
+"""Module for evaluating model throughput and latency."""
+
 import torch
 import time
 
-def measure_throughput_latency(model, dataloader, device='cuda'):
+
+def measure_throughput_latency(model, dataloader, device="cuda"):
     model.to(device)
     model.eval()  # Set model to evaluation mode
 
@@ -40,3 +43,14 @@ def measure_throughput_latency(model, dataloader, device='cuda'):
     throughput = total_samples / total_time  # in samples per second
 
     return avg_latency, throughput
+
+
+if __name__ == "__main__":
+    import argparse
+
+    parser = argparse.ArgumentParser(
+        description="Evaluate model throughput and latency."
+    )
+    parser.add_argument(
+        "--model", type=str, required=True, help="Path to the model file."
+    )

@@ -12,7 +12,6 @@ from models.proposed_model import (
     MobileNetV3_Small_CBAM_16,
     MobileNetV3_Small_CBAM_32,
 )
-import utils
 from torchvision import transforms
 
 
@@ -80,16 +79,11 @@ def start_training(
         optimizer=optimizer,
         epochs=num_epochs,
         device=device,
+        patience=5,
+        early_stopping=True,
+        min_delta=0,
+        checkpoint_dir="checkpoints",
     )
-
-    # Save the model with help from utils.py
-    utils.save_model(
-        model=model,
-        target_dir="checkpoints",
-        model_name="05_going_modular_script_mode_tinyvgg_model.pth",
-    )
-
-    return
 
 
 if __name__ == "__main__":
@@ -105,13 +99,18 @@ if __name__ == "__main__":
         default="mobilenetv3_large",
         choices=[
             "mobilenetv3_small",
-            "mobilenetv3_largeproposed_large_16",
+            "mobilenetv3_large",
+            "proposed_large_16",
             "proposed_large_32",
             "proposed_small_16",
             "proposed_small_32",
         ],
         help="name of the model",
     )
+    parser.add_argument(
+        "-e", "--epochs", type=int, default=1, help="number of epochs to train for"
+    )
     args = parser.parse_args()
     model_name = args.model
-    start_training(model_name)
+    num_epochs = args.epochs
+    start_training(model_name, num_epochs=num_epochs)

@@ -5,12 +5,17 @@ Contains functions for training and testing a PyTorch model.
 import torch
 from typing import Tuple, Dict, List
 from tqdm import tqdm
+import time
+from utils import EarlyStopping, TrainingLogger
 
-def train_step(model: torch.nn.Module, 
-               dataloader: torch.utils.data.DataLoader, 
-               loss_fn: torch.nn.Module, 
-               optimizer: torch.optim.Optimizer,
-               device: torch.device) -> Tuple[float, float]:
+
+def train_step(
+    model: torch.nn.Module,
+    dataloader: torch.utils.data.DataLoader,
+    loss_fn: torch.nn.Module,
+    optimizer: torch.optim.Optimizer,
+    device: torch.device,
+) -> Tuple[float, float]:
     """Trains a PyTorch model for a single epoch.
 
     Turns a target PyTorch model to training mode and then
@@ -46,7 +51,7 @@ def train_step(model: torch.nn.Module,
 
         # 2. Calculate  and accumulate loss
         loss = loss_fn(y_pred, y)
-        train_loss += loss.item() 
+        train_loss += loss.item()
 
         # 3. Optimizer zero grad
         optimizer.zero_grad()
@@ -59,18 +64,20 @@ def train_step(model: torch.nn.Module,
 
         # Calculate and accumulate accuracy metric across all batches
         y_pred_class = torch.argmax(torch.softmax(y_pred, dim=1), dim=1)
-        train_acc += (y_pred_class == y).sum().item()/len(y_pred)
+        train_acc += (y_pred_class == y).sum().item() / len(y_pred)
 
-    # Adjust metrics to get average loss and accuracy per batch 
+    # Adjust metrics to get average loss and accuracy per batch
     train_loss = train_loss / len(dataloader)
     train_acc = train_acc / len(dataloader)
     return train_loss, train_acc
 
 
-def valid_step(model: torch.nn.Module, 
-              dataloader: torch.utils.data.DataLoader, 
-              loss_fn: torch.nn.Module,
-              device: torch.device) -> Tuple[float, float]:
+def valid_step(
+    model: torch.nn.Module,
+    dataloader: torch.utils.data.DataLoader,
+    loss_fn: torch.nn.Module,
+    device: torch.device,
+) -> Tuple[float, float]:
     """Tests a PyTorch model for a single epoch.
 
     Turns a target PyTorch model to "eval" mode and then performs
@@ -89,7 +96,7 @@ def valid_step(model: torch.nn.Module,
     (0.0223, 0.8985)
     """
     # Put model in eval mode
-    model.eval() 
+    model.eval()
 
     # Setup test loss and test accuracy values
     val_loss, val_acc = 0, 0
@@ -110,62 +117,83 @@ def valid_step(model: torch.nn.Module,
 
             # Calculate and accumulate accuracy
             val_pred_labels = val_pred_logits.argmax(dim=1)
-            val_acc += ((val_pred_labels == y).sum().item()/len(val_pred_labels))
+            val_acc += (val_pred_labels == y).sum().item() / len(val_pred_labels)
 
-    # Adjust metrics to get average loss and accuracy per batch 
+    # Adjust metrics to get average loss and accuracy per batch
     test_loss = val_loss / len(dataloader)
     test_acc = val_acc / len(dataloader)
     return test_loss, test_acc
 
 
-
-def train(model: torch.nn.Module, 
-          train_dataloader: torch.utils.data.DataLoader, 
-          valid_dataloader: torch.utils.data.DataLoader, 
-          optimizer: torch.optim.Optimizer,
-          loss_fn: torch.nn.Module,
-          epochs: int,
-          device: torch.device) -> Dict[str, List]:
+def train(
+    model: torch.nn.Module,
+    train_dataloader: torch.utils.data.DataLoader,
+    valid_dataloader: torch.utils.data.DataLoader,
+    optimizer: torch.optim.Optimizer,
+    loss_fn: torch.nn.Module,
+    epochs: int,
+    device: torch.device,
+    patience: int = 5,
+    early_stopping: bool = False,
+    min_delta: float = 0.0,
+    checkpoint_dir: str = "checkpoints",
+) -> Dict[str, List]:
     """Trains and tests a PyTorch model.
 
-    Passes a target PyTorch models through train_step() and test_step()
+    Passes a target PyTorch model through train_step() and valid_step()
     functions for a number of epochs, training and testing the model
     in the same epoch loop.
 
     Calculates, prints and stores evaluation metrics throughout.
+    Supports early stopping functionality to prevent overfitting.
 
     Args:
-    model: A PyTorch model to be trained and tested.
-    train_dataloader: A DataLoader instance for the model to be trained on.
-    test_dataloader: A DataLoader instance for the model to be tested on.
-    optimizer: A PyTorch optimizer to help minimize the loss function.
-    loss_fn: A PyTorch loss function to calculate loss on both datasets.
-    epochs: An integer indicating how many epochs to train for.
-    device: A target device to compute on (e.g. "cuda" or "cpu").
+        model: A PyTorch model to be trained and tested.
+        train_dataloader: A DataLoader instance for the model to be trained on.
+        valid_dataloader: A DataLoader instance for the model to be validated on.
+        optimizer: A PyTorch optimizer to help minimize the loss function.
+        loss_fn: A PyTorch loss function to calculate loss on both datasets.
+        epochs: An integer indicating how many epochs to train for.
+        device: A target device to compute on (e.g. "cuda" or "cpu").
+        patience: Number of epochs with no improvement after which training will be stopped if early_stopping is True.
+        early_stopping: Boolean indicating whether to use early stopping.
+        min_delta: Minimum change in monitored value to qualify as improvement for early stopping.
+        checkpoint_dir: Directory to save model checkpoints for early stopping.
 
     Returns:
-    A dictionary of training and testing loss as well as training and
-    testing accuracy metrics. Each metric has a value in a list for 
-    each epoch.
-    In the form: {train_loss: [...],
-              train_acc: [...],
-              test_loss: [...],
-              test_acc: [...]} 
-    For example if training for epochs=2: 
-             {train_loss: [2.0616, 1.0537],
-              train_acc: [0.3945, 0.3945],
-              valid_loss: [1.2641, 1.5706],
-              valid_acc: [0.3400, 0.2973]} 
+        A dictionary of training and validation loss as well as training and
+        validation accuracy metrics. Each metric has a value in a list for
+        each epoch.
+        In the form: {
+            train_loss: [...],
+            train_acc: [...],
+            valid_loss: [...],
+            valid_acc: [...]
+        }
     """
+
+    start_time = time.time()  # Start timer
+
     # Create empty results dictionary
-    results = {"train_loss": [],
-               "train_acc": [],
-               "valid_loss": [],
-               "valid_acc": []
-    }
-    
+    results = {"train_loss": [], "train_acc": [], "valid_loss": [], "valid_acc": []}
+
     # Make sure model on target device
     model.to(device)
+
+    # Initialize early stopping if required
+    if early_stopping:
+        early_stopping = EarlyStopping(
+            patience=patience,
+            delta=min_delta,
+            save_best_model=True,
+            checkpoint_dir=checkpoint_dir,
+        )
+    else:
+        early_stopping = None
+
+    logger = TrainingLogger(
+        model_name=model.__class__.__name__, log_dir="results/training"
+    )
 
     # Loop through training and testing steps for a number of epochs
     for epoch in tqdm(range(epochs)):
@@ -174,30 +202,51 @@ def train(model: torch.nn.Module,
             dataloader=train_dataloader,
             loss_fn=loss_fn,
             optimizer=optimizer,
-            device=device
+            device=device,
         )
 
         valid_loss, valid_acc = valid_step(
-            model=model,
-            dataloader=valid_dataloader,
-            loss_fn=loss_fn,
-            device=device
+            model=model, dataloader=valid_dataloader, loss_fn=loss_fn, device=device
         )
+
+        # Log the epoch results
+        logger.log_epoch(epoch + 1, train_loss, train_acc, valid_loss, valid_acc)
 
         # Print out what's happening
         print(
-          f"Epoch: {epoch+1} | "
-          f"train_loss: {train_loss:.4f} | "
-          f"train_acc: {train_acc:.4f} | "
-          f"valid_loss: {valid_loss:.4f} | "
-          f"valid_acc: {valid_acc:.4f}"
+            f"Epoch: {epoch + 1}/{epoch} | "
+            f"train_loss: {train_loss:.4f} | "
+            f"train_acc: {train_acc:.4f} | "
+            f"valid_loss: {valid_loss:.4f} | "
+            f"valid_acc: {valid_acc:.4f}"
         )
+
+        # Call early stopping if required
+        if early_stopping:
+            early_stopping(
+                model=model,
+                val_loss=valid_loss,
+                epoch=epoch + 1,
+            )
+            if early_stopping.early_stop:
+                print("Early stopping triggered.")
+                break
 
         # Update results dictionary
         results["train_loss"].append(train_loss)
         results["train_acc"].append(train_acc)
         results["valid_loss"].append(valid_loss)
         results["valid_acc"].append(valid_acc)
+
+    end_time = time.time()  # End timer
+    total_time = end_time - start_time
+    print(f"Training completed in: {total_time // 60:.0f}m {total_time % 60:.0f}s")
+
+    # Print final results
+    print(results)
+
+    # Save the training logger to a CSV file
+    logger.save_to_csv()
 
     # Return the filled results at the end of the epochs
     return results
