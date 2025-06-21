@@ -155,48 +155,38 @@ def train(
         loss_fn: A PyTorch loss function to calculate loss on both datasets.
         epochs: An integer indicating how many epochs to train for.
         device: A target device to compute on (e.g. "cuda" or "cpu").
-        patience: Number of epochs with no improvement after which training will be stopped if early_stopping is True.
+        patience: Number of epochs with no improvement after which training will be stopped.
         early_stopping: Boolean indicating whether to use early stopping.
-        min_delta: Minimum change in monitored value to qualify as improvement for early stopping.
+        min_delta: Minimum change in monitored value to qualify as improvement.
         checkpoint_dir: Directory to save model checkpoints for early stopping.
 
     Returns:
-        A dictionary of training and validation loss as well as training and
-        validation accuracy metrics. Each metric has a value in a list for
-        each epoch.
-        In the form: {
-            train_loss: [...],
-            train_acc: [...],
-            valid_loss: [...],
-            valid_acc: [...]
-        }
+        A dictionary of training and validation metrics for each epoch:
+        {train_loss: [...], train_acc: [...], valid_loss: [...], valid_acc: [...]}
     """
-
-    start_time = time.time()  # Start timer
-
-    # Create empty results dictionary
+    # Setup tracking
+    start_time = time.time()
     results = {"train_loss": [], "train_acc": [], "valid_loss": [], "valid_acc": []}
-
-    # Make sure model on target device
     model.to(device)
 
-    # Initialize early stopping if required
+    # Initialize early stopping if enabled
+    early_stopper = None
     if early_stopping:
-        early_stopping = EarlyStopping(
+        early_stopper = EarlyStopping(
             patience=patience,
             delta=min_delta,
             save_best_model=True,
             checkpoint_dir=checkpoint_dir,
         )
-    else:
-        early_stopping = None
 
+    # Initialize training logger
     logger = TrainingLogger(
         model_name=model.__class__.__name__, log_dir="results/training"
     )
 
-    # Loop through training and testing steps for a number of epochs
+    # Training loop
     for epoch in tqdm(range(epochs)):
+        # Train and validate for current epoch
         train_loss, train_acc = train_step(
             model=model,
             dataloader=train_dataloader,
@@ -209,28 +199,8 @@ def train(
             model=model, dataloader=valid_dataloader, loss_fn=loss_fn, device=device
         )
 
-        # Log the epoch results
+        # Log results
         logger.log_epoch(epoch + 1, train_loss, train_acc, valid_loss, valid_acc)
-
-        # Print out what's happening
-        print(
-            f"Epoch: {epoch + 1}/{epoch} | "
-            f"train_loss: {train_loss:.4f} | "
-            f"train_acc: {train_acc:.4f} | "
-            f"valid_loss: {valid_loss:.4f} | "
-            f"valid_acc: {valid_acc:.4f}"
-        )
-
-        # Call early stopping if required
-        if early_stopping:
-            early_stopping(
-                model=model,
-                val_loss=valid_loss,
-                epoch=epoch + 1,
-            )
-            if early_stopping.early_stop:
-                print("Early stopping triggered.")
-                break
 
         # Update results dictionary
         results["train_loss"].append(train_loss)
@@ -238,15 +208,27 @@ def train(
         results["valid_loss"].append(valid_loss)
         results["valid_acc"].append(valid_acc)
 
-    end_time = time.time()  # End timer
-    total_time = end_time - start_time
-    print(f"Training completed in: {total_time // 60:.0f}m {total_time % 60:.0f}s")
+        # Print progress
+        print(
+            f"Epoch: {epoch + 1}/{epochs} | "
+            f"train_loss: {train_loss:.4f} | "
+            f"train_acc: {train_acc:.4f} | "
+            f"valid_loss: {valid_loss:.4f} | "
+            f"valid_acc: {valid_acc:.4f}"
+        )
 
-    # Print final results
-    print(results)
+        # Check early stopping
+        if early_stopper:
+            early_stopper(model=model, val_loss=valid_loss, epoch=epoch + 1)
+            if early_stopper.early_stop:
+                print("Early stopping triggered.")
+                break
 
-    # Save the training logger to a CSV file
+    # Finalize training
+    training_time = time.time() - start_time
+    print(
+        f"Training completed in: {int(training_time // 60)}m {int(training_time % 60)}s"
+    )
     logger.save_to_csv()
 
-    # Return the filled results at the end of the epochs
     return results
