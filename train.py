@@ -78,7 +78,7 @@ def start_training(
         loss_fn=loss_fn,
         optimizer=optimizer,
         epochs=num_epochs,
-        device=device,
+        device=torch.device(device),
         patience=5,
         early_stopping=True,
         min_delta=0,

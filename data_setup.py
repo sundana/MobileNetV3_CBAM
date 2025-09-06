@@ -1,4 +1,5 @@
 import os
+from typing import Optional
 
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader, random_split
@@ -9,7 +10,7 @@ def create_dataloader(
     data_path: str,
     transform: transforms.Compose,
     batch_size: int,
-    num_workers: int = NUM_WORKERS
+    num_workers: Optional[int] = NUM_WORKERS
 ):
     dataset = datasets.ImageFolder(root=data_path, transform=transform)
 
@@ -23,6 +24,15 @@ def create_dataloader(
     val_dataloader = DataLoader(val_dataset, batch_size=batch_size, shuffle=False)
     test_dataloader = DataLoader(test_dataset, batch_size=batch_size, shuffle=False)
 
-    class_names = test_dataloader.dataset.dataset.classes
+    class_names = dataset.classes
     
     return train_dataloader, val_dataloader, test_dataloader, class_names
+
+
+
+if __name__ == "__main__":
+    data_transform = transforms.Compose(
+        [transforms.Resize((224, 224)), transforms.ToTensor()]
+    )
+    create_dataloader(data_path='data', batch_size=64, num_workers=20, transform=data_transform)
+    
