@@ -1,0 +1,33 @@
+,precision,recall,f1-score,support
+Apple___Apple_scab,0.0,0.0,0.0,149.0
+Apple___Black_rot,0.0,0.0,0.0,165.0
+Apple___Cedar_apple_rust,0.0,0.0,0.0,150.0
+Apple___healthy,0.0,0.0,0.0,256.0
+Background_without_leaves,0.065587734241908,0.9005847953216374,0.1222707423580786,171.0
+Blueberry___healthy,0.0,0.0,0.0,209.0
+Cherry___Powdery_mildew,0.0,0.0,0.0,147.0
+Cherry___healthy,0.0,0.0,0.0,173.0
+Grape___Black_rot,0.0,0.0,0.0,189.0
+Grape___Esca_(Black_Measles),0.0,0.0,0.0,209.0
+Grape___Leaf_blight_(Isariopsis_Leaf_Spot),0.0,0.0,0.0,149.0
+Grape___healthy,0.0,0.0,0.0,140.0
+Orange___Haunglongbing_(Citrus_greening),0.0,0.0,0.0,849.0
+Peach___Bacterial_spot,0.0,0.0,0.0,346.0
+Peach___healthy,0.0,0.0,0.0,147.0
+Raspberry___healthy,0.0,0.0,0.0,142.0
+Squash___Powdery_mildew,0.0,0.0,0.0,271.0
+Strawberry___Leaf_scorch,0.0,0.0,0.0,172.0
+Strawberry___healthy,0.0,0.0,0.0,143.0
+Tomato___Bacterial_spot,0.0,0.0,0.0,300.0
+Tomato___Early_blight,0.0,0.0,0.0,155.0
+Tomato___Late_blight,0.0,0.0,0.0,294.0
+Tomato___Leaf_Mold,0.0,0.0,0.0,135.0
+Tomato___Septoria_leaf_spot,0.11643835616438356,0.8095238095238095,0.20359281437125748,273.0
+Tomato___Spider_mites Two-spotted_spider_mite,0.0,0.0,0.0,234.0
+Tomato___Target_Spot,0.0,0.0,0.0,222.0
+Tomato___Tomato_Yellow_Leaf_Curl_Virus,0.0,0.0,0.0,831.0
+Tomato___Tomato_mosaic_virus,0.0010997067448680353,0.020833333333333332,0.0020891364902506965,144.0
+Tomato___healthy,0.0,0.0,0.0,221.0
+accuracy,0.05410821643286573,0.05410821643286573,0.05410821643286573,0.05410821643286573
+macro avg,0.006314682660384813,0.0596876530406476,0.011308713559296097,6986.0
+weighted avg,0.006178289659247634,0.05410821643286573,0.010991979805493962,6986.0

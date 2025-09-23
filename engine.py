@@ -41,8 +41,18 @@ def train_step(
     # Setup train loss and train accuracy values
     train_loss, train_acc = 0, 0
 
+    # Create progress bar for training batches
+    batch_pbar = tqdm(
+        enumerate(dataloader),
+        total=len(dataloader),
+        desc="Training",
+        leave=False,
+        ncols=100,
+        bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}] {postfix}",
+    )
+
     # Loop through data loader data batches
-    for batch, (X, y) in enumerate(dataloader):
+    for batch, (X, y) in batch_pbar:
         # Send data to target device
         X, y = X.to(device), y.to(device)
 
@@ -64,7 +74,20 @@ def train_step(
 
         # Calculate and accumulate accuracy metric across all batches
         y_pred_class = torch.argmax(torch.softmax(y_pred, dim=1), dim=1)
-        train_acc += (y_pred_class == y).sum().item() / len(y_pred)
+        batch_acc = (y_pred_class == y).sum().item() / len(y_pred)
+        train_acc += batch_acc
+
+        # Update progress bar with current metrics
+        current_avg_loss = train_loss / (batch + 1)
+        current_avg_acc = train_acc / (batch + 1)
+        batch_pbar.set_postfix(
+            {
+                "Loss": f"{current_avg_loss:.4f}",
+                "Acc": f"{current_avg_acc:.4f}",
+                "Batch Loss": f"{loss.item():.4f}",
+                "Batch Acc": f"{batch_acc:.4f}",
+            }
+        )
 
     # Adjust metrics to get average loss and accuracy per batch
     train_loss = train_loss / len(dataloader)
@@ -101,10 +124,20 @@ def valid_step(
     # Setup test loss and test accuracy values
     val_loss, val_acc = 0, 0
 
+    # Create progress bar for validation batches
+    batch_pbar = tqdm(
+        enumerate(dataloader),
+        total=len(dataloader),
+        desc="Validation",
+        leave=False,
+        ncols=100,
+        bar_format="{l_bar}{bar}| {n_fmt}/{total_fmt} [{elapsed}<{remaining}, {rate_fmt}] {postfix}",
+    )
+
     # Turn on inference context manager
     with torch.inference_mode():
         # Loop through DataLoader batches
-        for batch, (X, y) in enumerate(dataloader):
+        for batch, (X, y) in batch_pbar:
             # Send data to target device
             X, y = X.to(device), y.to(device)
 
@@ -117,7 +150,20 @@ def valid_step(
 
             # Calculate and accumulate accuracy
             val_pred_labels = val_pred_logits.argmax(dim=1)
-            val_acc += (val_pred_labels == y).sum().item() / len(val_pred_labels)
+            batch_acc = (val_pred_labels == y).sum().item() / len(val_pred_labels)
+            val_acc += batch_acc
+
+            # Update progress bar with current metrics
+            current_avg_loss = val_loss / (batch + 1)
+            current_avg_acc = val_acc / (batch + 1)
+            batch_pbar.set_postfix(
+                {
+                    "Loss": f"{current_avg_loss:.4f}",
+                    "Acc": f"{current_avg_acc:.4f}",
+                    "Batch Loss": f"{loss.item():.4f}",
+                    "Batch Acc": f"{batch_acc:.4f}",
+                }
+            )
 
     # Adjust metrics to get average loss and accuracy per batch
     test_loss = val_loss / len(dataloader)
@@ -137,6 +183,8 @@ def train(
     early_stopping: bool = False,
     min_delta: float = 0.0,
     checkpoint_dir: str = "checkpoints",
+    enable_live_plot: bool = True,
+    scheduler=None,
 ) -> Dict[str, List]:
     """Trains and tests a PyTorch model.
 
@@ -159,6 +207,8 @@ def train(
         early_stopping: Boolean indicating whether to use early stopping.
         min_delta: Minimum change in monitored value to qualify as improvement.
         checkpoint_dir: Directory to save model checkpoints for early stopping.
+        enable_live_plot: Whether to enable real-time plotting during training.
+        scheduler: Optional learning rate scheduler.
 
     Returns:
         A dictionary of training and validation metrics for each epoch:
@@ -179,13 +229,24 @@ def train(
             checkpoint_dir=checkpoint_dir,
         )
 
-    # Initialize training logger
+    # Initialize enhanced training logger
     logger = TrainingLogger(
-        model_name=model.__class__.__name__, log_dir="results/training"
+        model_name=model.__class__.__name__,
+        log_dir="results/training",
+        enable_live_plot=enable_live_plot,
+        plot_every=1,  # Update plots every epoch
     )
 
+    # Main epoch progress bar
+    epoch_pbar = tqdm(range(epochs), desc="Overall Progress", ncols=120, position=0)
+
     # Training loop
-    for epoch in tqdm(range(epochs)):
+    for epoch in epoch_pbar:
+        epoch_start_time = time.time()
+
+        # Get current learning rate
+        current_lr = optimizer.param_groups[0]["lr"] if optimizer.param_groups else None
+
         # Train and validate for current epoch
         train_loss, train_acc = train_step(
             model=model,
@@ -199,8 +260,29 @@ def train(
             model=model, dataloader=valid_dataloader, loss_fn=loss_fn, device=device
         )
 
-        # Log results
-        logger.log_epoch(epoch + 1, train_loss, train_acc, valid_loss, valid_acc)
+        # Calculate epoch time
+        epoch_time = time.time() - epoch_start_time
+
+        # Update learning rate scheduler if provided
+        if scheduler:
+            # Handle different scheduler types
+            if hasattr(scheduler, "step"):
+                if "ReduceLROnPlateau" in scheduler.__class__.__name__:
+                    scheduler.step(valid_loss)
+                else:
+                    scheduler.step()
+            current_lr = optimizer.param_groups[0]["lr"]
+
+        # Log results with enhanced information
+        logger.log_epoch(
+            epoch + 1,
+            train_loss,
+            train_acc,
+            valid_loss,
+            valid_acc,
+            epoch_time=epoch_time,
+            learning_rate=current_lr,
+        )
 
         # Update results dictionary
         results["train_loss"].append(train_loss)
@@ -208,27 +290,51 @@ def train(
         results["valid_loss"].append(valid_loss)
         results["valid_acc"].append(valid_acc)
 
-        # Print progress
-        print(
-            f"Epoch: {epoch + 1}/{epochs} | "
-            f"train_loss: {train_loss:.4f} | "
-            f"train_acc: {train_acc:.4f} | "
-            f"valid_loss: {valid_loss:.4f} | "
-            f"valid_acc: {valid_acc:.4f}"
+        # Update main progress bar with comprehensive metrics
+        epoch_pbar.set_postfix(
+            {
+                "Train Loss": f"{train_loss:.4f}",
+                "Train Acc": f"{train_acc:.4f}",
+                "Val Loss": f"{valid_loss:.4f}",
+                "Val Acc": f"{valid_acc:.4f}",
+                "Best Val Acc": f"{logger.best_val_acc:.4f}",
+                "LR": f"{current_lr:.2e}" if current_lr else "N/A",
+                "Time": f"{epoch_time:.1f}s",
+            }
         )
+
+        # Print detailed progress (optional, can be disabled for cleaner output)
+        print(f"\nEpoch: {epoch + 1}/{epochs}")
+        print(f"  Train - Loss: {train_loss:.4f}, Acc: {train_acc:.4f}")
+        print(f"  Valid - Loss: {valid_loss:.4f}, Acc: {valid_acc:.4f}")
+        print(
+            f"  Time: {epoch_time:.2f}s, LR: {current_lr:.2e}"
+            if current_lr
+            else f"  Time: {epoch_time:.2f}s"
+        )
+        if logger.best_val_acc == valid_acc:
+            print(f"  🎉 New best validation accuracy!")
 
         # Check early stopping
         if early_stopper:
             early_stopper(model=model, val_loss=valid_loss, epoch=epoch + 1)
             if early_stopper.early_stop:
-                print("Early stopping triggered.")
+                print(f"\n🔴 Early stopping triggered at epoch {epoch + 1}")
                 break
 
     # Finalize training
     training_time = time.time() - start_time
+    print(f"\n✅ Training completed!")
+    print(f"📊 Final Results:")
+    print(f"   • Total time: {int(training_time // 60)}m {int(training_time % 60)}s")
     print(
-        f"Training completed in: {int(training_time // 60)}m {int(training_time % 60)}s"
+        f"   • Best validation accuracy: {logger.best_val_acc:.4f} (Epoch {logger.best_epoch})"
     )
+    print(f"   • Best validation loss: {logger.best_val_loss:.4f}")
+    print(f"   • Total epochs: {epoch + 1}")
+
+    # Save results
     logger.save_to_csv()
+    logger.save_final_plots()
 
     return results

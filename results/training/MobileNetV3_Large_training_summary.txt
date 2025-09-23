@@ -1,0 +1,8 @@
+Training Summary for MobileNetV3_Large
+========================================
+
+Total Epochs: 18
+Best Validation Accuracy: 0.9685 (Epoch 13)
+Best Validation Loss: 0.1132
+Average Time per Epoch: 105.06s
+Total Training Time: 1891.08s
