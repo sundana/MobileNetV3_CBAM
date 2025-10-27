@@ -2,7 +2,9 @@
 
 Eksekusi training melalui terminal
 
-`python train.py --model mobilenetv3_large --epoch 50`
+```bash
+python train.py --model mobilenetv3_large --epoch 50
+```
 
 Sesuaikan argument model dengan model yang tersedia di bawah ini.
 
