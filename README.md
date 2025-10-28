@@ -1,5 +1,11 @@
 # Memulai training
 
+Install package terlebih dahulu
+
+```bash
+pip install -r requirementes.txt
+```
+
 Eksekusi training melalui terminal
 
 ```bash
