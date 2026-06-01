@@ -23,24 +23,43 @@ def start_training(
     batch_size: int = 64,
     learning_rate: float = 0.001,
     data_dir: str = DATA_DIR,
+    device_name: str = "auto",
+    no_plot: bool = False,
 ):
     # Setup target device
-    if torch.cuda.is_available():
-        device = "cuda"
-    elif torch.backends.mps.is_available():
-        device = "mps"
+    if device_name == "auto":
+        if torch.cuda.is_available():
+            device = "cuda"
+        elif torch.backends.mps.is_available():
+            device = "mps"
+        else:
+            device = "cpu"
     else:
-        device = "cpu"
+        device = device_name
 
     # Create transforms
-    data_transform = transforms.Compose(
-        [transforms.Resize((224, 224)), transforms.ToTensor()]
-    )
+    train_transform = transforms.Compose([
+        transforms.RandomResizedCrop(224),
+        transforms.RandomHorizontalFlip(),
+        transforms.RandomRotation(15),
+        transforms.ColorJitter(brightness=0.2, contrast=0.2, saturation=0.2),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+    ])
+
+    test_transform = transforms.Compose([
+        transforms.Resize((224, 224)),
+        transforms.ToTensor(),
+        transforms.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]),
+    ])
 
     # Create DataLoaders with help from data_setup.py
     train_dataloader, val_dataloader, test_dataloader, class_names = (
         data_setup.create_dataloader(
-            data_path=data_dir, transform=data_transform, batch_size=batch_size
+            data_path=data_dir, 
+            train_transform=train_transform,
+            test_transform=test_transform,
+            batch_size=batch_size
         )
     )
 
@@ -87,6 +106,7 @@ def start_training(
         early_stopping=True,
         min_delta=0,
         checkpoint_dir=CHECKPOINT_DIR,
+        enable_live_plot=not no_plot,
     )
 
 
@@ -119,8 +139,22 @@ if __name__ == "__main__":
     parser.add_argument(
         "-d", "--data_dir", type=str, default=DATA_DIR, help="path to the dataset"
     )
+    parser.add_argument(
+        "--device", default="auto", help="device to use (cuda/cpu/auto)"
+    )
+    parser.add_argument(
+        "--no_plot", action="store_true", help="disable real-time plotting"
+    )
     args = parser.parse_args()
     model_name = args.model
     num_epochs = args.epochs
     data_dir = args.data_dir
-    start_training(model_name, num_epochs=num_epochs, data_dir=data_dir)
+    device_name = args.device
+    no_plot = args.no_plot
+    start_training(
+        model_name,
+        num_epochs=num_epochs,
+        data_dir=data_dir,
+        device_name=device_name,
+        no_plot=no_plot,
+    )

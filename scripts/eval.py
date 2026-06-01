@@ -59,7 +59,8 @@ def main():
     print("📁 Loading datasets...")
     train_loader, val_loader, test_loader, class_names = create_dataloader(
         data_path=args.data_dir,
-        transform=transform,
+        train_transform=transform,
+        test_transform=transform,
         batch_size=args.batch_size,
     )
 
