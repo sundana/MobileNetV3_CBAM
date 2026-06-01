@@ -7,7 +7,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn import init
-from models.cbam import CBAM
+from src.models.cbam import CBAM
 
 class SeModule(nn.Module):
     def __init__(self, in_size, reduction=4):

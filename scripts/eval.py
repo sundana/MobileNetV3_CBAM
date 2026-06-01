@@ -1,13 +1,17 @@
+import sys
+import os
+
+# Add the project root to the python path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import torch
 import torch.nn as nn
-import torch.optim as optim
-from tqdm import tqdm
-from utils import evaluate_model
+from src.utils import evaluate_model
+from src.data_setup import create_dataloader
+from src.config import DATA_DIR, CHECKPOINT_DIR, RESULTS_DIR
 from torchvision import transforms
-from data_setup import create_dataloader
-import os
-from dotenv import load_dotenv
 import argparse
+from functools import partial
 
 
 def main():
@@ -19,7 +23,7 @@ def main():
         "--batch_size", type=int, default=64, help="Batch size for evaluation"
     )
     parser.add_argument(
-        "--results_dir", default="results", help="Directory to save results"
+        "--results_dir", default=RESULTS_DIR, help="Directory to save results"
     )
 
     args = parser.parse_args()
@@ -32,13 +36,6 @@ def main():
 
     print(f"🔍 Starting evaluation on device: {device}")
 
-    load_dotenv()
-    data_path = os.environ.get("DATA_PATH")
-
-    if not data_path:
-        print("❌ DATA_PATH not found in environment variables")
-        return
-
     transform = transforms.Compose(
         [
             transforms.Resize((224, 224)),
@@ -49,7 +46,7 @@ def main():
 
     print("📁 Loading datasets...")
     train_loader, val_loader, test_loader, class_names = create_dataloader(
-        data_path=data_path,
+        data_path=DATA_DIR,
         transform=transform,
         batch_size=args.batch_size,
     )
@@ -60,8 +57,7 @@ def main():
     # Load model based on model type
     print(f"🤖 Loading model: {args.model}")
 
-    from models.mobilenetv3 import MobileNetV3_Large, MobileNetV3_Small
-    from functools import partial
+    from src.models.mobilenetv3 import MobileNetV3_Large, MobileNetV3_Small
 
     model_map = {
         "mobilenetv3_small": partial(MobileNetV3_Small, attention_type='se'),
@@ -70,12 +66,9 @@ def main():
         "proposed_large_32": partial(MobileNetV3_Large, attention_type='cbam', reduction_ratio=32),
         "proposed_small_16": partial(MobileNetV3_Small, attention_type='cbam', reduction_ratio=16),
         "proposed_small_32": partial(MobileNetV3_Small, attention_type='cbam', reduction_ratio=32),
-        # Backward compatibility for old names if needed
-        "proposed_model_large": partial(MobileNetV3_Large, attention_type='cbam', reduction_ratio=16),
-        "proposed_model_small": partial(MobileNetV3_Small, attention_type='cbam', reduction_ratio=16),
     }
 
-    checkpoint_path = f"checkpoints/{args.weight}.pth"
+    checkpoint_path = os.path.join(CHECKPOINT_DIR, f"{args.weight}.pth")
 
     if not os.path.exists(checkpoint_path):
         print(f"❌ Checkpoint not found: {checkpoint_path}")
@@ -120,21 +113,6 @@ def main():
         device=device,
         results_dir=args.results_dir,
     )
-
-    # Performance measurement
-    try:
-        from evaluations import measure_throughput_latency
-
-        print("\n⚡ Measuring performance...")
-        avg_latency, throughput = measure_throughput_latency(
-            model, test_loader, device=device
-        )
-        print(f"⏱️  Average Latency: {avg_latency:.4f} seconds per batch")
-        print(f"🚀 Throughput: {throughput:.2f} samples per second")
-    except ImportError:
-        print("⚠️  Performance measurement module not available")
-    except Exception as e:
-        print(f"⚠️  Error measuring performance: {e}")
 
     print("\n✅ Evaluation completed successfully!")
 

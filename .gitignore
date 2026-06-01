@@ -38,3 +38,6 @@ wheels/
 .installed.cfg
 *.egg
 MANIFEST
+
+
+paper/

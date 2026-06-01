@@ -1,6 +1,13 @@
+import sys
+import os
+
+# Add the project root to the python path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import torch.nn as nn
 from ptflops import get_model_complexity_info
 import pandas as pd
+from src.config import COMPLEXITY_DIR
 
 def calculate_flops(models: list[nn.Module]) -> pd.DataFrame:
     """Calculate model FLOPs
@@ -16,10 +23,18 @@ def calculate_flops(models: list[nn.Module]) -> pd.DataFrame:
         "flops": [],
         "params": []
     }
-    for model in models:
-        model = model(num_classes=29)
+    for model_factory in models:
+        model = model_factory(num_classes=29)
         flop, params = get_model_complexity_info(model, (3, 224, 224), as_strings=False, print_per_layer_stat=False)
-        model_complexity["models"].append(model.__class__.__name__)
+        
+        # Determine a descriptive name
+        name = model.__class__.__name__
+        if hasattr(model_factory, 'keywords'):
+            att = model_factory.keywords.get('attention_type', 'none')
+            red = model_factory.keywords.get('reduction_ratio', '')
+            name = f"{name}_{att}_{red}" if red else f"{name}_{att}"
+
+        model_complexity["models"].append(name)
         model_complexity["flops"].append(flop)
         model_complexity["params"].append(params)
 
@@ -28,7 +43,7 @@ def calculate_flops(models: list[nn.Module]) -> pd.DataFrame:
 
 
 if __name__ == "__main__":
-    from models import mobilenetv3
+    from src.models import mobilenetv3
     from functools import partial
     
     # Register model
@@ -42,6 +57,7 @@ if __name__ == "__main__":
     ]
 
     df = calculate_flops(models)
-    df.to_csv('./results/complexity/model_complexity.csv', index=False) # Save result csv
-    print("Saving model complexity completed to ./results/complexity")
+    save_path = os.path.join(COMPLEXITY_DIR, 'model_complexity.csv')
+    df.to_csv(save_path, index=False) # Save result csv
+    print(f"Saving model complexity completed to {COMPLEXITY_DIR}")
     print(df)

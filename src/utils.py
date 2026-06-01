@@ -16,10 +16,12 @@ import pandas as pd
 import csv
 
 
+from src.config import TRAINING_LOG_DIR, CHECKPOINT_DIR
+
 # Define EarlyStopping class with checkpoint saving
 class EarlyStopping:
     def __init__(
-        self, patience=5, delta=0, save_best_model=True, checkpoint_dir="checkpoints"
+        self, patience=5, delta=0, save_best_model=True, checkpoint_dir=CHECKPOINT_DIR
     ):
         """
         Args:
@@ -93,7 +95,7 @@ class TrainingLogger:
     def __init__(
         self,
         model_name=str,
-        log_dir="results/training",
+        log_dir=TRAINING_LOG_DIR,
         enable_live_plot=True,
         plot_every=1,
     ):
@@ -2017,7 +2019,7 @@ def save_model(model, optimizer, num_epochs, final_loss):
     }
     torch.save(
         checkpoint,
-        f"checkpoints/{model.__class__.__name__}-{dt_string.replace('/', '-').replace(':', '-')}.pth",
+        os.path.join(CHECKPOINT_DIR, f"{model.__class__.__name__}-{dt_string.replace('/', '-').replace(':', '-')}.pth"),
     )
 
 

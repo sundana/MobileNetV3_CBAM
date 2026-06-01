@@ -2,10 +2,16 @@
 Trains a PyTorch image classification model using device-agnostic code.
 """
 
+import sys
+import os
+
+# Add the project root to the python path
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
 import torch
-import data_setup
-import engine
-from models.mobilenetv3 import MobileNetV3_Large, MobileNetV3_Small
+from src import data_setup, engine
+from src.models.mobilenetv3 import MobileNetV3_Large, MobileNetV3_Small
+from src.config import DATA_DIR, CHECKPOINT_DIR
 from torchvision import transforms
 from functools import partial
 
@@ -16,9 +22,6 @@ def start_training(
     batch_size: int = 64,
     learning_rate: float = 0.001,
 ):
-    # Setup directories
-    data_path = "data/"
-
     # Setup target device
     if torch.cuda.is_available():
         device = "cuda"
@@ -35,7 +38,7 @@ def start_training(
     # Create DataLoaders with help from data_setup.py
     train_dataloader, val_dataloader, test_dataloader, class_names = (
         data_setup.create_dataloader(
-            data_path=data_path, transform=data_transform, batch_size=batch_size
+            data_path=DATA_DIR, transform=data_transform, batch_size=batch_size
         )
     )
 
@@ -78,7 +81,7 @@ def start_training(
         patience=5,
         early_stopping=True,
         min_delta=0,
-        checkpoint_dir="checkpoints",
+        checkpoint_dir=CHECKPOINT_DIR,
     )
 
 

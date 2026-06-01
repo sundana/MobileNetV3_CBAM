@@ -6,10 +6,12 @@ from torch.utils.data import DataLoader, random_split
 
 NUM_WORKERS = os.cpu_count()
 
+from src.config import DATA_DIR
+
 def create_dataloader(
-    data_path: str,
-    transform: transforms.Compose,
-    batch_size: int,
+    data_path: str = DATA_DIR,
+    transform: transforms.Compose = None,
+    batch_size: int = 64,
     num_workers: Optional[int] = NUM_WORKERS
 ):
     dataset = datasets.ImageFolder(root=data_path, transform=transform)

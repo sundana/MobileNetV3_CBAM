@@ -6,7 +6,7 @@ import torch
 from typing import Tuple, Dict, List
 from tqdm import tqdm
 import time
-from utils import EarlyStopping, TrainingLogger
+from src.utils import EarlyStopping, TrainingLogger
 
 
 def train_step(
