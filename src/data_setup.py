@@ -4,8 +4,8 @@ from typing import Optional
 from torchvision import datasets, transforms
 from torch.utils.data import DataLoader, random_split, Dataset
 
-# For Windows compatibility, default NUM_WORKERS to 0
-NUM_WORKERS = 0
+# For better GPU utilization, default NUM_WORKERS to 4
+NUM_WORKERS = 4
 
 from src.config import DATA_DIR
 
@@ -47,13 +47,13 @@ def create_dataloader(
     test_dataset = SubsetDataset(test_subset, test_transform)
 
     train_dataloader = DataLoader(
-        train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers if num_workers else 0
+        train_dataset, batch_size=batch_size, shuffle=True, num_workers=num_workers if num_workers else 0, pin_memory=True
     )
     val_dataloader = DataLoader(
-        val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers if num_workers else 0
+        val_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers if num_workers else 0, pin_memory=True
     )
     test_dataloader = DataLoader(
-        test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers if num_workers else 0
+        test_dataset, batch_size=batch_size, shuffle=False, num_workers=num_workers if num_workers else 0, pin_memory=True
     )
 
     class_names = base_dataset.classes

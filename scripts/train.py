@@ -2,6 +2,9 @@
 Trains a PyTorch image classification model using device-agnostic code.
 """
 
+import matplotlib
+matplotlib.use('Agg') # Prevents any matplotlib windows from opening
+
 import sys
 import os
 
@@ -143,14 +146,14 @@ if __name__ == "__main__":
         "--device", default="auto", help="device to use (cuda/cpu/auto)"
     )
     parser.add_argument(
-        "--no_plot", action="store_true", help="disable real-time plotting"
+        "--plot", action="store_true", help="enable real-time plotting"
     )
     args = parser.parse_args()
     model_name = args.model
     num_epochs = args.epochs
     data_dir = args.data_dir
     device_name = args.device
-    no_plot = args.no_plot
+    no_plot = not args.plot
     start_training(
         model_name,
         num_epochs=num_epochs,
