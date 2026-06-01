@@ -12,7 +12,7 @@ import torch
 from src import data_setup, engine
 from src.models.mobilenetv3 import MobileNetV3_Large, MobileNetV3_Small
 from src.models.baselines import get_mobilenet_v2, get_shufflenet_v2
-from src.config import DATA_DIR, CHECKPOINT_DIR
+from src.config import DATA_DIR, CHECKPOINT_DIR, PLANTVILLAGE_DIR
 from torchvision import transforms
 from functools import partial
 
@@ -22,7 +22,7 @@ def start_training(
     num_epochs: int = 1,
     batch_size: int = 64,
     learning_rate: float = 0.001,
-    data_dir: str = DATA_DIR,
+    data_dir: str = PLANTVILLAGE_DIR,
     device_name: str = "auto",
     no_plot: bool = False,
 ):
@@ -137,7 +137,7 @@ if __name__ == "__main__":
         "-e", "--epochs", type=int, default=1, help="number of epochs to train for"
     )
     parser.add_argument(
-        "-d", "--data_dir", type=str, default=DATA_DIR, help="path to the dataset"
+        "-d", "--data_dir", type=str, default=PLANTVILLAGE_DIR, help="path to the dataset"
     )
     parser.add_argument(
         "--device", default="auto", help="device to use (cuda/cpu/auto)"

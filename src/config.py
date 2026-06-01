@@ -5,6 +5,8 @@ ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 # Data Directories
 DATA_DIR = os.path.join(ROOT_DIR, "data")
+PLANTVILLAGE_DIR = os.path.join(DATA_DIR, "plantvillage")
+PLANTDOC_DIR = os.path.join(DATA_DIR, "plantdoc")
 
 # Output Directories
 RESULTS_DIR = os.path.join(ROOT_DIR, "results")

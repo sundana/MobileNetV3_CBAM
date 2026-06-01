@@ -8,7 +8,7 @@ import torch
 import torch.nn as nn
 from src.utils import evaluate_model
 from src.data_setup import create_dataloader
-from src.config import DATA_DIR, CHECKPOINT_DIR, RESULTS_DIR
+from src.config import DATA_DIR, CHECKPOINT_DIR, RESULTS_DIR, PLANTVILLAGE_DIR
 from torchvision import transforms
 import argparse
 from functools import partial
@@ -19,7 +19,7 @@ def main():
     parser.add_argument("-m", "--model", help="Model name", required=True)
     parser.add_argument("-w", "--weight", help="Model weight file name", required=True)
     parser.add_argument("-d", "--device", help="Device (cuda/cpu)", default="auto")
-    parser.add_argument("-data", "--data_dir", default=DATA_DIR, help="Path to evaluation dataset")
+    parser.add_argument("-data", "--data_dir", default=PLANTVILLAGE_DIR, help="Path to evaluation dataset")
     parser.add_argument(
         "--batch_size", type=int, default=64, help="Batch size for evaluation"
     )
