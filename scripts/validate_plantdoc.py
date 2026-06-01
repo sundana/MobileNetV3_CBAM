@@ -159,11 +159,17 @@ def main():
     # Handle key mismatch if necessary (e.g., 'module' vs 'attention_module')
     new_state_dict = {}
     for k, v in state_dict.items():
+        if ".se.se." in k:
+            k = k.replace(".se.se.", ".attention_module.se.")
+        if ".module.channel_attention.fc1." in k:
+            k = k.replace(".module.channel_attention.fc1.", ".attention_module.channel_attention.se.0.")
+        if ".module.channel_attention.fc2." in k:
+            k = k.replace(".module.channel_attention.fc2.", ".attention_module.channel_attention.se.2.")
+        if ".module.spatial_attention.conv." in k:
+            k = k.replace(".module.spatial_attention.conv.", ".attention_module.spatial_attention.conv.")
         if "bneck" in k and ".module." in k:
-            new_k = k.replace(".module.", ".attention_module.")
-            new_state_dict[new_k] = v
-        else:
-            new_state_dict[k] = v
+            k = k.replace(".module.", ".attention_module.")
+        new_state_dict[k] = v
     
     try:
         model.load_state_dict(new_state_dict)

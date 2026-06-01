@@ -100,16 +100,29 @@ def main():
 
         # Load model weights
         state_dict = torch.load(checkpoint_path, map_location=device)
-
-        # Handle different checkpoint formats
+        
+        # Unpack state_dict if it was saved as a dict with 'model_state_dict'
         if "model_state_dict" in state_dict:
-            model.load_state_dict(state_dict["model_state_dict"])
-            print(
-                f"✅ Loaded model checkpoint from epoch {state_dict.get('epoch', 'unknown')}"
-            )
+            state_dict_to_load = state_dict["model_state_dict"]
+            print(f"✅ Loaded model checkpoint from epoch {state_dict.get('epoch', 'unknown')}")
         else:
-            model.load_state_dict(state_dict)
+            state_dict_to_load = state_dict
             print("✅ Loaded model weights")
+
+        # Map keys to handle architecture refactoring (.se.se -> .attention_module.se)
+        mapped_state_dict = {}
+        for k, v in state_dict_to_load.items():
+            if ".se.se." in k:
+                k = k.replace(".se.se.", ".attention_module.se.")
+            if ".module.channel_attention.fc1." in k:
+                k = k.replace(".module.channel_attention.fc1.", ".attention_module.channel_attention.se.0.")
+            if ".module.channel_attention.fc2." in k:
+                k = k.replace(".module.channel_attention.fc2.", ".attention_module.channel_attention.se.2.")
+            if ".module.spatial_attention.conv." in k:
+                k = k.replace(".module.spatial_attention.conv.", ".attention_module.spatial_attention.conv.")
+            mapped_state_dict[k] = v
+            
+        model.load_state_dict(mapped_state_dict)
 
     except Exception as e:
         print(f"❌ Error loading model: {e}")
