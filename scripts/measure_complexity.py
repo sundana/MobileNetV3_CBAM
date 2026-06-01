@@ -21,12 +21,16 @@ def calculate_flops(models: list[nn.Module]) -> pd.DataFrame:
     model_complexity = {
         "models": [],
         "flops": [],
-        "params": []
+        "params": [],
+        "memory_size_mb": []
     }
     for model_factory in models:
         model = model_factory(num_classes=29)
         flop, params = get_model_complexity_info(model, (3, 224, 224), as_strings=False, print_per_layer_stat=False)
         
+        # Calculate memory size (MB) based on parameters (float32 = 4 bytes)
+        memory_size_mb = (params * 4) / (1024 * 1024)
+
         # Determine a descriptive name
         name = model.__class__.__name__
         if hasattr(model_factory, 'keywords'):
@@ -37,6 +41,7 @@ def calculate_flops(models: list[nn.Module]) -> pd.DataFrame:
         model_complexity["models"].append(name)
         model_complexity["flops"].append(flop)
         model_complexity["params"].append(params)
+        model_complexity["memory_size_mb"].append(memory_size_mb)
 
     df = pd.DataFrame(model_complexity)
     return df
@@ -44,6 +49,7 @@ def calculate_flops(models: list[nn.Module]) -> pd.DataFrame:
 
 if __name__ == "__main__":
     from src.models import mobilenetv3
+    from src.models.baselines import get_mobilenet_v2, get_shufflenet_v2
     from functools import partial
     
     # Register model
@@ -54,6 +60,8 @@ if __name__ == "__main__":
         partial(mobilenetv3.MobileNetV3_Small, attention_type='se'), 
         partial(mobilenetv3.MobileNetV3_Small, attention_type='cbam', reduction_ratio=16),
         partial(mobilenetv3.MobileNetV3_Small, attention_type='cbam', reduction_ratio=32),
+        get_mobilenet_v2,
+        get_shufflenet_v2,
     ]
 
     df = calculate_flops(models)

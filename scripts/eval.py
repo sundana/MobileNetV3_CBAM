@@ -19,6 +19,7 @@ def main():
     parser.add_argument("-m", "--model", help="Model name", required=True)
     parser.add_argument("-w", "--weight", help="Model weight file name", required=True)
     parser.add_argument("-d", "--device", help="Device (cuda/cpu)", default="auto")
+    parser.add_argument("-data", "--data_dir", default=DATA_DIR, help="Path to evaluation dataset")
     parser.add_argument(
         "--batch_size", type=int, default=64, help="Batch size for evaluation"
     )
@@ -35,6 +36,17 @@ def main():
         device = torch.device(args.device)
 
     print(f"🔍 Starting evaluation on device: {device}")
+    
+    # Print hardware information
+    import platform
+    import psutil
+    print(f"💻 OS: {platform.system()} {platform.release()}")
+    print(f"🧠 CPU: {platform.processor()}")
+    if torch.cuda.is_available() and device.type == 'cuda':
+        print(f"🎮 GPU: {torch.cuda.get_device_name(0)}")
+        print(f"📼 GPU Memory: {torch.cuda.get_device_properties(0).total_memory / 1e9:.2f} GB")
+    else:
+        print(f"🐏 RAM: {psutil.virtual_memory().total / 1e9:.2f} GB")
 
     transform = transforms.Compose(
         [
@@ -46,7 +58,7 @@ def main():
 
     print("📁 Loading datasets...")
     train_loader, val_loader, test_loader, class_names = create_dataloader(
-        data_path=DATA_DIR,
+        data_path=args.data_dir,
         transform=transform,
         batch_size=args.batch_size,
     )
@@ -58,6 +70,7 @@ def main():
     print(f"🤖 Loading model: {args.model}")
 
     from src.models.mobilenetv3 import MobileNetV3_Large, MobileNetV3_Small
+    from src.models.baselines import get_mobilenet_v2, get_shufflenet_v2
 
     model_map = {
         "mobilenetv3_small": partial(MobileNetV3_Small, attention_type='se'),
@@ -66,6 +79,8 @@ def main():
         "proposed_large_32": partial(MobileNetV3_Large, attention_type='cbam', reduction_ratio=32),
         "proposed_small_16": partial(MobileNetV3_Small, attention_type='cbam', reduction_ratio=16),
         "proposed_small_32": partial(MobileNetV3_Small, attention_type='cbam', reduction_ratio=32),
+        "mobilenetv2": get_mobilenet_v2,
+        "shufflenetv2": get_shufflenet_v2,
     }
 
     checkpoint_path = os.path.join(CHECKPOINT_DIR, f"{args.weight}.pth")

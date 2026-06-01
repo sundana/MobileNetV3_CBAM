@@ -11,6 +11,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 import torch
 from src import data_setup, engine
 from src.models.mobilenetv3 import MobileNetV3_Large, MobileNetV3_Small
+from src.models.baselines import get_mobilenet_v2, get_shufflenet_v2
 from src.config import DATA_DIR, CHECKPOINT_DIR
 from torchvision import transforms
 from functools import partial
@@ -21,6 +22,7 @@ def start_training(
     num_epochs: int = 1,
     batch_size: int = 64,
     learning_rate: float = 0.001,
+    data_dir: str = DATA_DIR,
 ):
     # Setup target device
     if torch.cuda.is_available():
@@ -38,7 +40,7 @@ def start_training(
     # Create DataLoaders with help from data_setup.py
     train_dataloader, val_dataloader, test_dataloader, class_names = (
         data_setup.create_dataloader(
-            data_path=DATA_DIR, transform=data_transform, batch_size=batch_size
+            data_path=data_dir, transform=data_transform, batch_size=batch_size
         )
     )
 
@@ -50,6 +52,8 @@ def start_training(
         "proposed_large_32": partial(MobileNetV3_Large, attention_type='cbam', reduction_ratio=32),
         "proposed_small_16": partial(MobileNetV3_Small, attention_type='cbam', reduction_ratio=16),
         "proposed_small_32": partial(MobileNetV3_Small, attention_type='cbam', reduction_ratio=32),
+        "mobilenetv2": get_mobilenet_v2,
+        "shufflenetv2": get_shufflenet_v2,
     }
 
     # Get model class from map or default to MobileNetV3_Large (SE)
@@ -68,6 +72,7 @@ def start_training(
     print(f"Loss function: {loss_fn.__class__.__name__}")
     print(f"Optimizer: {optimizer}")
     print(f"Device: {device}")
+    print(f"Data Directory: {data_dir}")
 
     # Start training with help from engine.py
     engine.train(
@@ -103,13 +108,19 @@ if __name__ == "__main__":
             "proposed_large_32",
             "proposed_small_16",
             "proposed_small_32",
+            "mobilenetv2",
+            "shufflenetv2",
         ],
         help="name of the model",
     )
     parser.add_argument(
         "-e", "--epochs", type=int, default=1, help="number of epochs to train for"
     )
+    parser.add_argument(
+        "-d", "--data_dir", type=str, default=DATA_DIR, help="path to the dataset"
+    )
     args = parser.parse_args()
     model_name = args.model
     num_epochs = args.epochs
-    start_training(model_name, num_epochs=num_epochs)
+    data_dir = args.data_dir
+    start_training(model_name, num_epochs=num_epochs, data_dir=data_dir)

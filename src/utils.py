@@ -1300,11 +1300,20 @@ def evaluate_model(
     # Evaluation with progress bar
     eval_pbar = tqdm(test_loader, desc="Evaluating", ncols=100)
 
+    # Variables for efficiency metrics
+    inference_times = []
+
     # Evaluate the model
     with torch.no_grad():
         for batch_idx, (inputs, labels) in enumerate(eval_pbar):
             inputs, labels = inputs.to(device), labels.to(device)
+            
+            # Measure inference time for this batch
+            batch_start = time.time()
             outputs = model(inputs)
+            batch_end = time.time()
+            inference_times.append(batch_end - batch_start)
+
             loss = criterion(outputs, labels)
 
             # Get predictions and probabilities
@@ -1327,6 +1336,11 @@ def evaluate_model(
     # Calculate average loss
     final_loss = total_loss / len(test_loader.dataset)
 
+    # Calculate Efficiency Metrics
+    avg_batch_time = np.mean(inference_times)
+    latency = avg_batch_time  # in seconds per batch
+    throughput = test_loader.batch_size / avg_batch_time  # in samples per second
+
     # Convert to numpy arrays
     all_preds = np.array(all_preds)
     all_labels = np.array(all_labels)
@@ -1335,12 +1349,21 @@ def evaluate_model(
     print(f"\n* Evaluation Results:")
     print(f"   • Final Loss: {final_loss:.4f}")
     print(f"   • Overall Accuracy: {(all_preds == all_labels).mean():.4f}")
+    print(f"   • Latency: {latency*1000:.2f} ms/batch")
+    print(f"   • Throughput: {throughput:.2f} samples/sec")
 
     # Calculate comprehensive metrics
     cm = confusion_matrix(all_labels, all_preds)
     metrics = calculate_comprehensive_metrics(
         all_labels, all_preds, all_probs, class_names
     )
+    
+    # Add efficiency metrics to the metrics dictionary
+    metrics["efficiency"] = {
+        "Latency (ms/batch)": latency * 1000,
+        "Throughput (samples/sec)": throughput,
+        "Avg Inference Time (ms/batch)": avg_batch_time * 1000
+    }
 
     # Create comprehensive evaluation dashboard
     create_evaluation_dashboard(
