@@ -1353,7 +1353,7 @@ def evaluate_model(
     print(f"   • Throughput: {throughput:.2f} samples/sec")
 
     # Calculate comprehensive metrics
-    cm = confusion_matrix(all_labels, all_preds)
+    cm = confusion_matrix(all_labels, all_preds, labels=range(len(class_names)))
     metrics = calculate_comprehensive_metrics(
         all_labels, all_preds, all_probs, class_names
     )
@@ -1382,6 +1382,7 @@ def evaluate_model(
         all_labels,
         all_preds,
         target_names=class_names,
+        labels=range(len(class_names)),
         output_dict=True,
         zero_division=0,
     )
@@ -1416,9 +1417,9 @@ def calculate_comprehensive_metrics(labels, preds, probs, class_names):
     f1 = f1_score(labels, preds, average="weighted", zero_division=0)
 
     # Per-class metrics
-    precision_per_class = precision_score(labels, preds, average=None, zero_division=0)
-    recall_per_class = recall_score(labels, preds, average=None, zero_division=0)
-    f1_per_class = f1_score(labels, preds, average=None, zero_division=0)
+    precision_per_class = precision_score(labels, preds, average=None, labels=range(len(class_names)), zero_division=0)
+    recall_per_class = recall_score(labels, preds, average=None, labels=range(len(class_names)), zero_division=0)
+    f1_per_class = f1_score(labels, preds, average=None, labels=range(len(class_names)), zero_division=0)
 
     # Multi-class ROC AUC
     try:
