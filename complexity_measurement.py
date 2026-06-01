@@ -28,16 +28,17 @@ def calculate_flops(models: list[nn.Module]) -> pd.DataFrame:
 
 
 if __name__ == "__main__":
-    from models import mobilenetv3, proposed_model
+    from models import mobilenetv3
+    from functools import partial
     
     # Register model
     models = [ 
-        mobilenetv3.MobileNetV3_Large, 
-        proposed_model.MobileNetV3_Large_CBAM_16,
-        proposed_model.MobileNetV3_Large_CBAM_32,
-        mobilenetv3.MobileNetV3_Small, 
-        proposed_model.MobileNetV3_Small_CBAM_16,
-        proposed_model.MobileNetV3_Small_CBAM_32,
+        partial(mobilenetv3.MobileNetV3_Large, attention_type='se'), 
+        partial(mobilenetv3.MobileNetV3_Large, attention_type='cbam', reduction_ratio=16),
+        partial(mobilenetv3.MobileNetV3_Large, attention_type='cbam', reduction_ratio=32),
+        partial(mobilenetv3.MobileNetV3_Small, attention_type='se'), 
+        partial(mobilenetv3.MobileNetV3_Small, attention_type='cbam', reduction_ratio=16),
+        partial(mobilenetv3.MobileNetV3_Small, attention_type='cbam', reduction_ratio=32),
     ]
 
     df = calculate_flops(models)

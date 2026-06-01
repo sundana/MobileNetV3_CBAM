@@ -1,26 +1,13 @@
 '''MobileNetV3 in PyTorch.
 
-See the paper "Inverted Residuals and Linear Bottlenecks:
-Mobile Networks for Classification, Detection and Segmentation" for more details.
+See the paper "Searching for MobileNetV3" for more details.
+This implementation is consolidated to support both SE and CBAM attention modules.
 '''
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from torch.nn import init
-
-
-
-class hswish(nn.Module):
-    def forward(self, x):
-        out = x * F.relu6(x + 3, inplace=True) / 6
-        return out
-
-
-class hsigmoid(nn.Module):
-    def forward(self, x):
-        out = F.relu6(x + 3, inplace=True) / 6
-        return out
-
+from models.cbam import CBAM
 
 class SeModule(nn.Module):
     def __init__(self, in_size, reduction=4):
@@ -32,19 +19,18 @@ class SeModule(nn.Module):
             nn.ReLU(inplace=True),
             nn.Conv2d(in_size // reduction, in_size, kernel_size=1, stride=1, padding=0, bias=False),
             nn.BatchNorm2d(in_size),
-            hsigmoid()
+            nn.Hardsigmoid()
         )
 
     def forward(self, x):
         return x * self.se(x)
 
-
 class Block(nn.Module):
     '''expand + depthwise + pointwise'''
-    def __init__(self, kernel_size, in_size, expand_size, out_size, nolinear, semodule, stride):
+    def __init__(self, kernel_size, in_size, expand_size, out_size, nolinear, attention_module, stride):
         super(Block, self).__init__()
         self.stride = stride
-        self.se = semodule
+        self.attention_module = attention_module
 
         self.conv1 = nn.Conv2d(in_size, expand_size, kernel_size=1, stride=1, padding=0, bias=False)
         self.bn1 = nn.BatchNorm2d(expand_size)
@@ -66,44 +52,49 @@ class Block(nn.Module):
         out = self.nolinear1(self.bn1(self.conv1(x)))
         out = self.nolinear2(self.bn2(self.conv2(out)))
         out = self.bn3(self.conv3(out))
-        if self.se != None:
-            out = self.se(out)
+        if self.attention_module is not None:
+            out = self.attention_module(out)
         out = out + self.shortcut(x) if self.stride==1 else out
         return out
 
-
 class MobileNetV3_Large(nn.Module):
-    def __init__(self, num_classes=1000):
+    def __init__(self, num_classes=1000, attention_type='se', reduction_ratio=16):
         super(MobileNetV3_Large, self).__init__()
         self.conv1 = nn.Conv2d(3, 16, kernel_size=3, stride=2, padding=1, bias=False)
         self.bn1 = nn.BatchNorm2d(16)
-        self.hs1 = hswish()
+        self.hs1 = nn.Hardswish()
+
+        def _get_attention_module(channels):
+            if attention_type == 'se':
+                return SeModule(channels, reduction=4)
+            elif attention_type == 'cbam':
+                return CBAM(channels, reduction=reduction_ratio)
+            return None
 
         self.bneck = nn.Sequential(
             Block(3, 16, 16, 16, nn.ReLU(inplace=True), None, 1),
             Block(3, 16, 64, 24, nn.ReLU(inplace=True), None, 2),
             Block(3, 24, 72, 24, nn.ReLU(inplace=True), None, 1),
-            Block(5, 24, 72, 40, nn.ReLU(inplace=True), SeModule(40), 2),
-            Block(5, 40, 120, 40, nn.ReLU(inplace=True), SeModule(40), 1),
-            Block(5, 40, 120, 40, nn.ReLU(inplace=True), SeModule(40), 1),
-            Block(3, 40, 240, 80, hswish(), None, 2),
-            Block(3, 80, 200, 80, hswish(), None, 1),
-            Block(3, 80, 184, 80, hswish(), None, 1),
-            Block(3, 80, 184, 80, hswish(), None, 1),
-            Block(3, 80, 480, 112, hswish(), SeModule(112), 1),
-            Block(3, 112, 672, 112, hswish(), SeModule(112), 1),
-            Block(5, 112, 672, 160, hswish(), SeModule(160), 1),
-            Block(5, 160, 672, 160, hswish(), SeModule(160), 2),
-            Block(5, 160, 960, 160, hswish(), SeModule(160), 1),
+            Block(5, 24, 72, 40, nn.ReLU(inplace=True), _get_attention_module(40), 2),
+            Block(5, 40, 120, 40, nn.ReLU(inplace=True), _get_attention_module(40), 1),
+            Block(5, 40, 120, 40, nn.ReLU(inplace=True), _get_attention_module(40), 1),
+            Block(3, 40, 240, 80, nn.Hardswish(), None, 2),
+            Block(3, 80, 200, 80, nn.Hardswish(), None, 1),
+            Block(3, 80, 184, 80, nn.Hardswish(), None, 1),
+            Block(3, 80, 184, 80, nn.Hardswish(), None, 1),
+            Block(3, 80, 480, 112, nn.Hardswish(), _get_attention_module(112), 1),
+            Block(3, 112, 672, 112, nn.Hardswish(), _get_attention_module(112), 1),
+            Block(5, 112, 672, 160, nn.Hardswish(), _get_attention_module(160), 1),
+            Block(5, 160, 672, 160, nn.Hardswish(), _get_attention_module(160), 2),
+            Block(5, 160, 960, 160, nn.Hardswish(), _get_attention_module(160), 1),
         )
-
 
         self.conv2 = nn.Conv2d(160, 960, kernel_size=1, stride=1, padding=0, bias=False)
         self.bn2 = nn.BatchNorm2d(960)
-        self.hs2 = hswish()
+        self.hs2 = nn.Hardswish()
         self.linear3 = nn.Linear(960, 1280)
         self.bn3 = nn.BatchNorm1d(1280)
-        self.hs3 = hswish()
+        self.hs3 = nn.Hardswish()
         self.linear4 = nn.Linear(1280, num_classes)
         self.init_params()
 
@@ -131,36 +122,41 @@ class MobileNetV3_Large(nn.Module):
         out = self.linear4(out)
         return out
 
-
-
 class MobileNetV3_Small(nn.Module):
-    def __init__(self, num_classes=1000):
+    def __init__(self, num_classes=1000, attention_type='se', reduction_ratio=16):
         super(MobileNetV3_Small, self).__init__()
         self.conv1 = nn.Conv2d(3, 16, kernel_size=3, stride=2, padding=1, bias=False)
         self.bn1 = nn.BatchNorm2d(16)
-        self.hs1 = hswish()
+        self.hs1 = nn.Hardswish()
+
+        def _get_attention_module(channels, force_reduction=None):
+            if attention_type == 'se':
+                return SeModule(channels, reduction=4)
+            elif attention_type == 'cbam':
+                red = force_reduction if force_reduction else reduction_ratio
+                return CBAM(channels, reduction=red)
+            return None
 
         self.bneck = nn.Sequential(
-            Block(3, 16, 16, 16, nn.ReLU(inplace=True), SeModule(16), 2),
+            Block(3, 16, 16, 16, nn.ReLU(inplace=True), _get_attention_module(16, force_reduction=16), 2),
             Block(3, 16, 72, 24, nn.ReLU(inplace=True), None, 2),
             Block(3, 24, 88, 24, nn.ReLU(inplace=True), None, 1),
-            Block(5, 24, 96, 40, hswish(), SeModule(40), 2),
-            Block(5, 40, 240, 40, hswish(), SeModule(40), 1),
-            Block(5, 40, 240, 40, hswish(), SeModule(40), 1),
-            Block(5, 40, 120, 48, hswish(), SeModule(48), 1),
-            Block(5, 48, 144, 48, hswish(), SeModule(48), 1),
-            Block(5, 48, 288, 96, hswish(), SeModule(96), 2),
-            Block(5, 96, 576, 96, hswish(), SeModule(96), 1),
-            Block(5, 96, 576, 96, hswish(), SeModule(96), 1),
+            Block(5, 24, 96, 40, nn.Hardswish(), _get_attention_module(40), 2),
+            Block(5, 40, 240, 40, nn.Hardswish(), _get_attention_module(40), 1),
+            Block(5, 40, 240, 40, nn.Hardswish(), _get_attention_module(40), 1),
+            Block(5, 40, 120, 48, nn.Hardswish(), _get_attention_module(48), 1),
+            Block(5, 48, 144, 48, nn.Hardswish(), _get_attention_module(48), 1),
+            Block(5, 48, 288, 96, nn.Hardswish(), _get_attention_module(96), 2),
+            Block(5, 96, 576, 96, nn.Hardswish(), _get_attention_module(96), 1),
+            Block(5, 96, 576, 96, nn.Hardswish(), _get_attention_module(96), 1),
         )
-
 
         self.conv2 = nn.Conv2d(96, 576, kernel_size=1, stride=1, padding=0, bias=False)
         self.bn2 = nn.BatchNorm2d(576)
-        self.hs2 = hswish()
+        self.hs2 = nn.Hardswish()
         self.linear3 = nn.Linear(576, 1280)
         self.bn3 = nn.BatchNorm1d(1280)
-        self.hs3 = hswish()
+        self.hs3 = nn.Hardswish()
         self.linear4 = nn.Linear(1280, num_classes)
         self.init_params()
 
@@ -187,13 +183,3 @@ class MobileNetV3_Small(nn.Module):
         out = self.hs3(self.bn3(self.linear3(out)))
         out = self.linear4(out)
         return out
-
-
-
-def test():
-    net = MobileNetV3_Small()
-    x = torch.randn(2,3,224,224)
-    y = net(x)
-    print(y.size())
-
-# test()

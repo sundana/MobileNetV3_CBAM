@@ -6,13 +6,8 @@ import torch
 import data_setup
 import engine
 from models.mobilenetv3 import MobileNetV3_Large, MobileNetV3_Small
-from models.proposed_model import (
-    MobileNetV3_Large_CBAM_16,
-    MobileNetV3_Large_CBAM_32,
-    MobileNetV3_Small_CBAM_16,
-    MobileNetV3_Small_CBAM_32,
-)
 from torchvision import transforms
+from functools import partial
 
 
 def start_training(
@@ -46,16 +41,17 @@ def start_training(
 
     # Model selection using dictionary mapping
     model_map = {
-        "mobilenetv3_small": MobileNetV3_Small,
-        "proposed_large_16": MobileNetV3_Large_CBAM_16,
-        "proposed_large_32": MobileNetV3_Large_CBAM_32,
-        "proposed_small_16": MobileNetV3_Small_CBAM_16,
-        "proposed_small_32": MobileNetV3_Small_CBAM_32,
+        "mobilenetv3_small": partial(MobileNetV3_Small, attention_type='se'),
+        "mobilenetv3_large": partial(MobileNetV3_Large, attention_type='se'),
+        "proposed_large_16": partial(MobileNetV3_Large, attention_type='cbam', reduction_ratio=16),
+        "proposed_large_32": partial(MobileNetV3_Large, attention_type='cbam', reduction_ratio=32),
+        "proposed_small_16": partial(MobileNetV3_Small, attention_type='cbam', reduction_ratio=16),
+        "proposed_small_32": partial(MobileNetV3_Small, attention_type='cbam', reduction_ratio=32),
     }
 
-    # Get model class from map or default to MobileNetV3_Large
-    model_class = model_map.get(model_name, MobileNetV3_Large)
-    model = model_class(num_classes=len(class_names)).to(device)
+    # Get model class from map or default to MobileNetV3_Large (SE)
+    model_factory = model_map.get(model_name, partial(MobileNetV3_Large, attention_type='se'))
+    model = model_factory(num_classes=len(class_names)).to(device)
 
     # Set loss and optimizer
     loss_fn = torch.nn.CrossEntropyLoss()

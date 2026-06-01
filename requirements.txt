@@ -65,10 +65,10 @@ sympy==1.13.3
 tensorboard==2.19.0
 tensorboard-data-server==0.7.2
 threadpoolctl==3.6.0
-torch==2.8.0+cu129
+torch==2.8.0+cu132
 torch-tb-profiler==0.4.3
 torchinfo==1.8.0
-torchvision==0.23.0+cu129
+torchvision==0.23.0+cu132
 tornado==6.4.2
 tqdm==4.67.1
 traitlets==5.14.3

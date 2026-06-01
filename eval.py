@@ -60,7 +60,21 @@ def main():
     # Load model based on model type
     print(f"🤖 Loading model: {args.model}")
 
-    model = None
+    from models.mobilenetv3 import MobileNetV3_Large, MobileNetV3_Small
+    from functools import partial
+
+    model_map = {
+        "mobilenetv3_small": partial(MobileNetV3_Small, attention_type='se'),
+        "mobilenetv3_large": partial(MobileNetV3_Large, attention_type='se'),
+        "proposed_large_16": partial(MobileNetV3_Large, attention_type='cbam', reduction_ratio=16),
+        "proposed_large_32": partial(MobileNetV3_Large, attention_type='cbam', reduction_ratio=32),
+        "proposed_small_16": partial(MobileNetV3_Small, attention_type='cbam', reduction_ratio=16),
+        "proposed_small_32": partial(MobileNetV3_Small, attention_type='cbam', reduction_ratio=32),
+        # Backward compatibility for old names if needed
+        "proposed_model_large": partial(MobileNetV3_Large, attention_type='cbam', reduction_ratio=16),
+        "proposed_model_small": partial(MobileNetV3_Small, attention_type='cbam', reduction_ratio=16),
+    }
+
     checkpoint_path = f"checkpoints/{args.weight}.pth"
 
     if not os.path.exists(checkpoint_path):
@@ -68,25 +82,12 @@ def main():
         return
 
     try:
-        if args.model == "proposed_model_large":
-            from models.mobilenetv3 import MobileNetV3_Large
-
-            model = MobileNetV3_Large(num_classes=num_classes)
-        elif args.model == "proposed_model_small":
-            from models.mobilenetv3 import MobileNetV3_Small
-
-            model = MobileNetV3_Small(num_classes=num_classes)
-        elif args.model == "mobilenetv3_large":
-            from models.mobilenetv3 import MobileNetV3_Large
-
-            model = MobileNetV3_Large(num_classes=num_classes)
-        elif args.model == "mobilenetv3_small":
-            from models.mobilenetv3 import MobileNetV3_Small
-
-            model = MobileNetV3_Small(num_classes=num_classes)
-        else:
+        model_factory = model_map.get(args.model)
+        if model_factory is None:
             print(f"❌ Unknown model type: {args.model}")
             return
+        
+        model = model_factory(num_classes=num_classes)
 
         # Load model weights
         state_dict = torch.load(checkpoint_path, map_location=device)
