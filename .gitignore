@@ -1,7 +1,18 @@
 /penulisan
 .env
-/checkpoints
-/plots
+
+# Results and Outputs
+results/checkpoints/
+results/plots/
+results/training/
+results/evaluation/
+results/confusion_matrix/
+results/csv/
+results/complexity/
+
+# Datasets
+# PlantVillage is tracked via LFS, but PlantDoc should be ignored if not intended for repo
+data/
 
 # Jupyter Notebook
 .ipynb_checkpoints
@@ -39,7 +50,6 @@ wheels/
 *.egg
 MANIFEST
 
-
 # LaTeX
 *.aux
 *.bbl
@@ -52,6 +62,5 @@ MANIFEST
 *.synctex.gz
 *.toc
 *.spl
-
 
 TODO.md
