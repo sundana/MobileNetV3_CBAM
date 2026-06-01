@@ -2,6 +2,7 @@
 .env
 
 # Results and Outputs
+results/*
 results/checkpoints/
 results/plots/
 results/training/
