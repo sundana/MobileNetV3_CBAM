@@ -8,6 +8,12 @@ matplotlib.use('Agg') # Prevents any matplotlib windows from opening
 import sys
 import os
 
+# Fix Unicode emoji printing on Windows
+try:
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+except Exception:
+    pass
+
 # Add the project root to the python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 

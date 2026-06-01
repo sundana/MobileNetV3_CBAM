@@ -1,6 +1,12 @@
 import sys
 import os
 import torch
+
+# Fix Unicode emoji printing on Windows
+try:
+    sys.stdout.reconfigure(encoding='utf-8', errors='replace')
+except Exception:
+    pass
 import torch.nn as nn
 from torchvision import transforms
 from torch.utils.data import DataLoader, Dataset

@@ -6,7 +6,7 @@ import torch
 from typing import Tuple, Dict, List
 from tqdm import tqdm
 import time
-from src.utils import EarlyStopping, TrainingLogger
+from src.utils import EarlyStopping, TrainingLogger, _get_model_display_name
 
 
 def train_step(
@@ -231,7 +231,7 @@ def train(
 
     # Initialize enhanced training logger
     logger = TrainingLogger(
-        model_name=model.__class__.__name__,
+        model_name=_get_model_display_name(model),
         log_dir="results/training",
         enable_live_plot=enable_live_plot,
         plot_every=1,  # Update plots every epoch

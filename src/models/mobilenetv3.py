@@ -60,6 +60,8 @@ class Block(nn.Module):
 class MobileNetV3_Large(nn.Module):
     def __init__(self, num_classes=1000, attention_type='se', reduction_ratio=16):
         super(MobileNetV3_Large, self).__init__()
+        self.attention_type = attention_type
+        self.reduction_ratio = reduction_ratio
         self.conv1 = nn.Conv2d(3, 16, kernel_size=3, stride=2, padding=1, bias=False)
         self.bn1 = nn.BatchNorm2d(16)
         self.hs1 = nn.Hardswish()
@@ -125,6 +127,8 @@ class MobileNetV3_Large(nn.Module):
 class MobileNetV3_Small(nn.Module):
     def __init__(self, num_classes=1000, attention_type='se', reduction_ratio=16):
         super(MobileNetV3_Small, self).__init__()
+        self.attention_type = attention_type
+        self.reduction_ratio = reduction_ratio
         self.conv1 = nn.Conv2d(3, 16, kernel_size=3, stride=2, padding=1, bias=False)
         self.bn1 = nn.BatchNorm2d(16)
         self.hs1 = nn.Hardswish()

@@ -18,6 +18,19 @@ import csv
 
 from src.config import TRAINING_LOG_DIR, CHECKPOINT_DIR
 
+
+def _get_model_display_name(model):
+    """Build a descriptive checkpoint filename from model attributes."""
+    cls_name = model.__class__.__name__
+    att = getattr(model, 'attention_type', None)
+    red = getattr(model, 'reduction_ratio', None)
+    if att == 'cbam' and red:
+        return f"{cls_name}_CBAM_r{red}"
+    elif att == 'se':
+        return f"{cls_name}_SE"
+    return cls_name
+
+
 # Define EarlyStopping class with checkpoint saving
 class EarlyStopping:
     def __init__(
@@ -77,7 +90,7 @@ class EarlyStopping:
         if self.best_checkpoint_path and os.path.exists(self.best_checkpoint_path):
             os.remove(self.best_checkpoint_path)  # Remove previous best checkpoint
 
-        model_name = model.__class__.__name__
+        model_name = _get_model_display_name(model)
         self.best_checkpoint_path = os.path.join(
             self.checkpoint_dir, f"{model_name}_epoch_{epoch}.pth"
         )
