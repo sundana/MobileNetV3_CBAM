@@ -80,8 +80,14 @@ def main():
     from src.models.baselines import get_mobilenet_v2, get_shufflenet_v2
 
     model_map = {
-        "mobilenetv3_small": partial(MobileNetV3_Small, attention_type='se'),
-        "mobilenetv3_large": partial(MobileNetV3_Large, attention_type='se'),
+        "mobilenetv3_small": partial(MobileNetV3_Small, attention_type='se', reduction_ratio=4),
+        "mobilenetv3_large": partial(MobileNetV3_Large, attention_type='se', reduction_ratio=4),
+        "mobilenetv3_small_none": partial(MobileNetV3_Small, attention_type='none'),
+        "mobilenetv3_large_none": partial(MobileNetV3_Large, attention_type='none'),
+        "mobilenetv3_small_se_r16": partial(MobileNetV3_Small, attention_type='se', reduction_ratio=16),
+        "mobilenetv3_large_se_r16": partial(MobileNetV3_Large, attention_type='se', reduction_ratio=16),
+        "mobilenetv3_small_se_r32": partial(MobileNetV3_Small, attention_type='se', reduction_ratio=32),
+        "mobilenetv3_large_se_r32": partial(MobileNetV3_Large, attention_type='se', reduction_ratio=32),
         "proposed_large_16": partial(MobileNetV3_Large, attention_type='cbam', reduction_ratio=16),
         "proposed_large_32": partial(MobileNetV3_Large, attention_type='cbam', reduction_ratio=32),
         "proposed_small_16": partial(MobileNetV3_Small, attention_type='cbam', reduction_ratio=16),

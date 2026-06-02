@@ -101,11 +101,13 @@ class PlantDocMappedDataset(Dataset):
 
 def main():
     parser = argparse.ArgumentParser(description="Validate model on PlantDoc dataset")
-    parser.add_argument("-m", "--model", help="Model name", required=True)
-    parser.add_argument("-w", "--weight", help="Model weight file name", required=True)
+    parser.add_argument("-m", "--model", help="Model name (or 'all' for all variants)", required=True)
+    parser.add_argument("-w", "--weight", help="Model weight file name (ignored if --model=all)", default=None)
     parser.add_argument("-d", "--device", help="Device (cuda/cpu)", default="auto")
     parser.add_argument("--batch_size", type=int, default=32, help="Batch size")
-    
+    parser.add_argument("--bootstrap", action="store_true", help="Compute bootstrap CIs for accuracy")
+    parser.add_argument("--seed", type=int, default=42, help="Random seed")
+
     args = parser.parse_args()
 
     if args.device == "auto":
@@ -113,7 +115,10 @@ def main():
     else:
         device = torch.device(args.device)
 
-    print(f"🔍 Starting PlantDoc validation on: {device}")
+    from src.config import set_seed
+    set_seed(args.seed)
+
+    print(f"PlantDoc Validation on device: {device}")
 
     transform = transforms.Compose([
         transforms.Resize((224, 224)),
@@ -136,8 +141,14 @@ def main():
 
     # Load model
     model_map = {
-        "mobilenetv3_small": partial(MobileNetV3_Small, attention_type='se'),
-        "mobilenetv3_large": partial(MobileNetV3_Large, attention_type='se'),
+        "mobilenetv3_small": partial(MobileNetV3_Small, attention_type='se', reduction_ratio=4),
+        "mobilenetv3_large": partial(MobileNetV3_Large, attention_type='se', reduction_ratio=4),
+        "mobilenetv3_small_none": partial(MobileNetV3_Small, attention_type='none'),
+        "mobilenetv3_large_none": partial(MobileNetV3_Large, attention_type='none'),
+        "mobilenetv3_small_se_r16": partial(MobileNetV3_Small, attention_type='se', reduction_ratio=16),
+        "mobilenetv3_large_se_r16": partial(MobileNetV3_Large, attention_type='se', reduction_ratio=16),
+        "mobilenetv3_small_se_r32": partial(MobileNetV3_Small, attention_type='se', reduction_ratio=32),
+        "mobilenetv3_large_se_r32": partial(MobileNetV3_Large, attention_type='se', reduction_ratio=32),
         "proposed_large_16": partial(MobileNetV3_Large, attention_type='cbam', reduction_ratio=16),
         "proposed_large_32": partial(MobileNetV3_Large, attention_type='cbam', reduction_ratio=32),
         "proposed_small_16": partial(MobileNetV3_Small, attention_type='cbam', reduction_ratio=16),
@@ -146,61 +157,124 @@ def main():
         "shufflenetv2": get_shufflenet_v2,
     }
 
-    model_factory = model_map.get(args.model)
-    if not model_factory:
-        print(f"❌ Unknown model: {args.model}")
-        return
+    # Determine which models to evaluate
+    if args.model == "all":
+        models_to_eval = list(model_map.keys())
+    else:
+        if args.model not in model_map:
+            print(f"Unknown model: {args.model}")
+            return
+        models_to_eval = [args.model]
 
-    model = model_factory(num_classes=len(PV_CLASSES)).to(device)
-    checkpoint_path = os.path.join(CHECKPOINT_DIR, f"{args.weight}.pth")
-    
-    if not os.path.exists(checkpoint_path):
-        print(f"❌ Checkpoint not found: {checkpoint_path}")
-        return
+    all_results = {}
 
-    state_dict = torch.load(checkpoint_path, map_location=device)
-    if "model_state_dict" in state_dict:
-        state_dict = state_dict["model_state_dict"]
-    
-    # Handle key mismatch if necessary (e.g., 'module' vs 'attention_module')
-    new_state_dict = {}
-    for k, v in state_dict.items():
-        if ".se.se." in k:
-            k = k.replace(".se.se.", ".attention_module.se.")
-        if ".module.channel_attention.fc1." in k:
-            k = k.replace(".module.channel_attention.fc1.", ".attention_module.channel_attention.se.0.")
-        if ".module.channel_attention.fc2." in k:
-            k = k.replace(".module.channel_attention.fc2.", ".attention_module.channel_attention.se.2.")
-        if ".module.spatial_attention.conv." in k:
-            k = k.replace(".module.spatial_attention.conv.", ".attention_module.spatial_attention.conv.")
-        if "bneck" in k and ".module." in k:
-            k = k.replace(".module.", ".attention_module.")
-        new_state_dict[k] = v
-    
-    try:
-        model.load_state_dict(new_state_dict)
-    except RuntimeError as e:
-        print(f"⚠️  First load attempt failed: {e}")
-        print("🔄 Attempting to load without key mapping...")
-        model.load_state_dict(state_dict)
-    
-    print(f"✅ Loaded weights from {checkpoint_path}")
+    for model_name in models_to_eval:
+        print(f"\n{'='*60}")
+        print(f"Evaluating: {model_name}")
 
-    # Run evaluation
-    results_dir = os.path.join(RESULTS_DIR, "plantdoc_validation", args.model)
-    os.makedirs(results_dir, exist_ok=True)
+        model_factory = model_map[model_name]
+        model = model_factory(num_classes=len(PV_CLASSES)).to(device)
 
-    cm, metrics, final_loss = evaluate_model(
-        model=model,
-        criterion=nn.CrossEntropyLoss(),
-        test_loader=dataloader,
-        class_names=PV_CLASSES,
-        device=device,
-        results_dir=results_dir
-    )
+        # Try to find the checkpoint
+        if args.weight:
+            checkpoint_path = os.path.join(CHECKPOINT_DIR, f"{args.weight}.pth")
+        else:
+            # Auto-discover checkpoint
+            candidates = [f for f in os.listdir(CHECKPOINT_DIR) if f.startswith(model_name.split('_')[0])]
+            if not candidates:
+                # Try by looking for model name prefix
+                candidates = [f for f in os.listdir(CHECKPOINT_DIR) if f.lower().startswith(model_name.lower())]
+            if not candidates:
+                print(f"No checkpoint found for {model_name}, skipping.")
+                continue
+            checkpoint_path = os.path.join(CHECKPOINT_DIR, candidates[0])
+            print(f"Using checkpoint: {candidates[0]}")
 
-    print(f"\n✨ Validation on PlantDoc finished!")
-    print(f"📊 Results saved to: {results_dir}")
+        if not os.path.exists(checkpoint_path):
+            print(f"Checkpoint not found: {checkpoint_path}, skipping.")
+            continue
+
+        state_dict = torch.load(checkpoint_path, map_location=device)
+        if "model_state_dict" in state_dict:
+            state_dict = state_dict["model_state_dict"]
+
+        # Handle key mismatch
+        new_state_dict = {}
+        for k, v in state_dict.items():
+            if ".se.se." in k:
+                k = k.replace(".se.se.", ".attention_module.se.")
+            if ".module.channel_attention.fc1." in k:
+                k = k.replace(".module.channel_attention.fc1.", ".attention_module.channel_attention.se.0.")
+            if ".module.channel_attention.fc2." in k:
+                k = k.replace(".module.channel_attention.fc2.", ".attention_module.channel_attention.se.2.")
+            if ".module.spatial_attention.conv." in k:
+                k = k.replace(".module.spatial_attention.conv.", ".attention_module.spatial_attention.conv.")
+            if "bneck" in k and ".module." in k:
+                k = k.replace(".module.", ".attention_module.")
+            new_state_dict[k] = v
+
+        try:
+            missing, unexpected = model.load_state_dict(new_state_dict, strict=False)
+            if missing or unexpected:
+                print(f"Non-strict load: {len(missing)} missing, {len(unexpected)} unexpected keys")
+                if missing:
+                    print(f"  Missing (first 3): {missing[:3]}")
+                if unexpected:
+                    print(f"  Unexpected (first 3): {unexpected[:3]}")
+        except RuntimeError as e:
+            print(f"Failed to load checkpoint: {e}")
+            continue
+
+        print(f"Loaded weights from {checkpoint_path}")
+
+        # Run evaluation
+        results_dir = os.path.join(RESULTS_DIR, "plantdoc_validation", model_name)
+        os.makedirs(results_dir, exist_ok=True)
+
+        cm, metrics, final_loss = evaluate_model(
+            model=model,
+            criterion=nn.CrossEntropyLoss(),
+            test_loader=dataloader,
+            class_names=PV_CLASSES,
+            device=device,
+            results_dir=results_dir
+        )
+
+        all_results[model_name] = {
+            "accuracy": metrics.get("accuracy", 0.0),
+            "macro_f1": metrics.get("macro avg", {}).get("f1-score", 0.0) if "macro avg" in metrics else metrics.get("macro_f1", 0.0),
+        }
+
+        print(f"Accuracy: {all_results[model_name]['accuracy']:.2f}%")
+
+        # Bootstrap CI if requested
+        if args.bootstrap:
+            from src.statistical_tests import bootstrap_accuracy_ci
+            # Collect predictions
+            all_preds, all_labels = [], []
+            model.eval()
+            with torch.inference_mode():
+                for images, labels in dataloader:
+                    images = images.to(device)
+                    outputs = model(images)
+                    preds = outputs.argmax(dim=1).cpu().numpy()
+                    all_preds.extend(preds.tolist())
+                    all_labels.extend(labels.numpy().tolist())
+            all_preds = np.array(all_preds)
+            all_labels = np.array(all_labels)
+            ci_low, ci_mean, ci_high = bootstrap_accuracy_ci(all_labels, all_preds, seed=args.seed)
+            print(f"95% CI: [{ci_low*100:.2f}%, {ci_high*100:.2f}%] (mean: {ci_mean*100:.2f}%)")
+
+    # Summary table
+    if len(all_results) > 1:
+        print(f"\n{'='*60}")
+        print("PLANTDOC ZERO-SHOT SUMMARY")
+        print(f"{'Model':<35} {'Accuracy':>10}")
+        print("-" * 47)
+        for name, res in sorted(all_results.items(), key=lambda x: -x[1]["accuracy"]):
+            print(f"{name:<35} {res['accuracy']:>9.2f}%")
+
+    print(f"\nValidation on PlantDoc finished!")
 
 if __name__ == "__main__":
     main()

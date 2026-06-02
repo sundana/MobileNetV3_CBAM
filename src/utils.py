@@ -24,10 +24,12 @@ def _get_model_display_name(model):
     cls_name = model.__class__.__name__
     att = getattr(model, 'attention_type', None)
     red = getattr(model, 'reduction_ratio', None)
-    if att == 'cbam' and red:
+    if att == 'none':
+        return f"{cls_name}_NoAttn"
+    elif att == 'cbam' and red:
         return f"{cls_name}_CBAM_r{red}"
-    elif att == 'se':
-        return f"{cls_name}_SE"
+    elif att == 'se' and red:
+        return f"{cls_name}_SE_r{red}"
     return cls_name
 
 

@@ -1,4 +1,7 @@
 import os
+import random
+import numpy as np
+import torch
 
 # Project Root
 ROOT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -18,6 +21,27 @@ EVAL_DIR = os.path.join(RESULTS_DIR, "evaluation")
 COMPLEXITY_DIR = os.path.join(RESULTS_DIR, "complexity")
 CONFUSION_MATRIX_DIR = os.path.join(RESULTS_DIR, "confusion_matrix")
 
+# Domain Adaptation / Cross-Validation Directories
+DOMAIN_ADAPT_DIR = os.path.join(RESULTS_DIR, "domain_adaptation")
+CROSSVAL_DIR = os.path.join(RESULTS_DIR, "cross_validation")
+PLANTDOC_SPLIT_DIR = os.path.join(DATA_DIR, "plantdoc_split")
+
+# Default Random Seed
+DEFAULT_SEED = 42
+
 # Create directories if they don't exist
-for d in [RESULTS_DIR, CHECKPOINT_DIR, TRAINING_LOG_DIR, PLOT_DIR, CSV_DIR, EVAL_DIR, COMPLEXITY_DIR, CONFUSION_MATRIX_DIR]:
+for d in [RESULTS_DIR, CHECKPOINT_DIR, TRAINING_LOG_DIR, PLOT_DIR, CSV_DIR,
+          EVAL_DIR, COMPLEXITY_DIR, CONFUSION_MATRIX_DIR,
+          DOMAIN_ADAPT_DIR, CROSSVAL_DIR]:
     os.makedirs(d, exist_ok=True)
+
+
+def set_seed(seed: int = DEFAULT_SEED):
+    """Set random seeds for reproducibility across all libraries."""
+    random.seed(seed)
+    np.random.seed(seed)
+    torch.manual_seed(seed)
+    torch.cuda.manual_seed(seed)
+    torch.cuda.manual_seed_all(seed)
+    torch.backends.cudnn.deterministic = True
+    torch.backends.cudnn.benchmark = False

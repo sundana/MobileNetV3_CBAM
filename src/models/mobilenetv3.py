@@ -1,7 +1,8 @@
 '''MobileNetV3 in PyTorch.
 
 See the paper "Searching for MobileNetV3" for more details.
-This implementation is consolidated to support both SE and CBAM attention modules.
+This implementation supports SE, CBAM, and no-attention (none) variants
+with configurable reduction ratios for both attention types.
 '''
 import torch
 import torch.nn as nn
@@ -12,6 +13,8 @@ from src.models.cbam import CBAM
 class SeModule(nn.Module):
     def __init__(self, in_size, reduction=4):
         super(SeModule, self).__init__()
+        if in_size // reduction == 0:
+            reduction = in_size
         self.se = nn.Sequential(
             nn.AdaptiveAvgPool2d(1),
             nn.Conv2d(in_size, in_size // reduction, kernel_size=1, stride=1, padding=0, bias=False),
@@ -57,8 +60,23 @@ class Block(nn.Module):
         out = out + self.shortcut(x) if self.stride==1 else out
         return out
 
+
+def _make_attention(attention_type, channels, reduction_ratio):
+    """Factory: create SE, CBAM, or None attention module."""
+    red = reduction_ratio
+    if channels // red == 0:
+        red = channels  # prevent zero-channel bottleneck
+    if attention_type == 'se':
+        return SeModule(channels, reduction=red)
+    elif attention_type == 'cbam':
+        return CBAM(channels, reduction=red)
+    elif attention_type == 'none':
+        return None
+    return None
+
+
 class MobileNetV3_Large(nn.Module):
-    def __init__(self, num_classes=1000, attention_type='se', reduction_ratio=16):
+    def __init__(self, num_classes=1000, attention_type='se', reduction_ratio=4):
         super(MobileNetV3_Large, self).__init__()
         self.attention_type = attention_type
         self.reduction_ratio = reduction_ratio
@@ -66,29 +84,24 @@ class MobileNetV3_Large(nn.Module):
         self.bn1 = nn.BatchNorm2d(16)
         self.hs1 = nn.Hardswish()
 
-        def _get_attention_module(channels):
-            if attention_type == 'se':
-                return SeModule(channels, reduction=4)
-            elif attention_type == 'cbam':
-                return CBAM(channels, reduction=reduction_ratio)
-            return None
+        attn = lambda c: _make_attention(attention_type, c, reduction_ratio)
 
         self.bneck = nn.Sequential(
             Block(3, 16, 16, 16, nn.ReLU(inplace=True), None, 1),
             Block(3, 16, 64, 24, nn.ReLU(inplace=True), None, 2),
             Block(3, 24, 72, 24, nn.ReLU(inplace=True), None, 1),
-            Block(5, 24, 72, 40, nn.ReLU(inplace=True), _get_attention_module(40), 2),
-            Block(5, 40, 120, 40, nn.ReLU(inplace=True), _get_attention_module(40), 1),
-            Block(5, 40, 120, 40, nn.ReLU(inplace=True), _get_attention_module(40), 1),
+            Block(5, 24, 72, 40, nn.ReLU(inplace=True), attn(40), 2),
+            Block(5, 40, 120, 40, nn.ReLU(inplace=True), attn(40), 1),
+            Block(5, 40, 120, 40, nn.ReLU(inplace=True), attn(40), 1),
             Block(3, 40, 240, 80, nn.Hardswish(), None, 2),
             Block(3, 80, 200, 80, nn.Hardswish(), None, 1),
             Block(3, 80, 184, 80, nn.Hardswish(), None, 1),
             Block(3, 80, 184, 80, nn.Hardswish(), None, 1),
-            Block(3, 80, 480, 112, nn.Hardswish(), _get_attention_module(112), 1),
-            Block(3, 112, 672, 112, nn.Hardswish(), _get_attention_module(112), 1),
-            Block(5, 112, 672, 160, nn.Hardswish(), _get_attention_module(160), 1),
-            Block(5, 160, 672, 160, nn.Hardswish(), _get_attention_module(160), 2),
-            Block(5, 160, 960, 160, nn.Hardswish(), _get_attention_module(160), 1),
+            Block(3, 80, 480, 112, nn.Hardswish(), attn(112), 1),
+            Block(3, 112, 672, 112, nn.Hardswish(), attn(112), 1),
+            Block(5, 112, 672, 160, nn.Hardswish(), attn(160), 1),
+            Block(5, 160, 672, 160, nn.Hardswish(), attn(160), 2),
+            Block(5, 160, 960, 160, nn.Hardswish(), attn(160), 1),
         )
 
         self.conv2 = nn.Conv2d(160, 960, kernel_size=1, stride=1, padding=0, bias=False)
@@ -124,8 +137,9 @@ class MobileNetV3_Large(nn.Module):
         out = self.linear4(out)
         return out
 
+
 class MobileNetV3_Small(nn.Module):
-    def __init__(self, num_classes=1000, attention_type='se', reduction_ratio=16):
+    def __init__(self, num_classes=1000, attention_type='se', reduction_ratio=4):
         super(MobileNetV3_Small, self).__init__()
         self.attention_type = attention_type
         self.reduction_ratio = reduction_ratio
@@ -133,26 +147,20 @@ class MobileNetV3_Small(nn.Module):
         self.bn1 = nn.BatchNorm2d(16)
         self.hs1 = nn.Hardswish()
 
-        def _get_attention_module(channels, force_reduction=None):
-            if attention_type == 'se':
-                return SeModule(channels, reduction=4)
-            elif attention_type == 'cbam':
-                red = force_reduction if force_reduction else reduction_ratio
-                return CBAM(channels, reduction=red)
-            return None
+        attn = lambda c: _make_attention(attention_type, c, reduction_ratio)
 
         self.bneck = nn.Sequential(
-            Block(3, 16, 16, 16, nn.ReLU(inplace=True), _get_attention_module(16, force_reduction=16), 2),
+            Block(3, 16, 16, 16, nn.ReLU(inplace=True), attn(16), 2),
             Block(3, 16, 72, 24, nn.ReLU(inplace=True), None, 2),
             Block(3, 24, 88, 24, nn.ReLU(inplace=True), None, 1),
-            Block(5, 24, 96, 40, nn.Hardswish(), _get_attention_module(40), 2),
-            Block(5, 40, 240, 40, nn.Hardswish(), _get_attention_module(40), 1),
-            Block(5, 40, 240, 40, nn.Hardswish(), _get_attention_module(40), 1),
-            Block(5, 40, 120, 48, nn.Hardswish(), _get_attention_module(48), 1),
-            Block(5, 48, 144, 48, nn.Hardswish(), _get_attention_module(48), 1),
-            Block(5, 48, 288, 96, nn.Hardswish(), _get_attention_module(96), 2),
-            Block(5, 96, 576, 96, nn.Hardswish(), _get_attention_module(96), 1),
-            Block(5, 96, 576, 96, nn.Hardswish(), _get_attention_module(96), 1),
+            Block(5, 24, 96, 40, nn.Hardswish(), attn(40), 2),
+            Block(5, 40, 240, 40, nn.Hardswish(), attn(40), 1),
+            Block(5, 40, 240, 40, nn.Hardswish(), attn(40), 1),
+            Block(5, 40, 120, 48, nn.Hardswish(), attn(48), 1),
+            Block(5, 48, 144, 48, nn.Hardswish(), attn(48), 1),
+            Block(5, 48, 288, 96, nn.Hardswish(), attn(96), 2),
+            Block(5, 96, 576, 96, nn.Hardswish(), attn(96), 1),
+            Block(5, 96, 576, 96, nn.Hardswish(), attn(96), 1),
         )
 
         self.conv2 = nn.Conv2d(96, 576, kernel_size=1, stride=1, padding=0, bias=False)

@@ -26,17 +26,28 @@ def calculate_flops(models: list[nn.Module]) -> pd.DataFrame:
     }
     for model_factory in models:
         model = model_factory(num_classes=29)
-        flop, params = get_model_complexity_info(model, (3, 224, 224), as_strings=False, print_per_layer_stat=False)
-        
+        try:
+            flop, params = get_model_complexity_info(model, (3, 224, 224), as_strings=False, print_per_layer_stat=False)
+        except Exception:
+            flop, params = None, sum(p.numel() for p in model.parameters())
+
         # Calculate memory size (MB) based on parameters (float32 = 4 bytes)
-        memory_size_mb = (params * 4) / (1024 * 1024)
+        if params is not None:
+            memory_size_mb = (params * 4) / (1024 * 1024)
+        else:
+            memory_size_mb = None
 
         # Determine a descriptive name
         name = model.__class__.__name__
         if hasattr(model_factory, 'keywords'):
             att = model_factory.keywords.get('attention_type', 'none')
             red = model_factory.keywords.get('reduction_ratio', '')
-            name = f"{name}_{att}_{red}" if red else f"{name}_{att}"
+            if att == 'none':
+                name = f"{name}_none"
+            elif att == 'se':
+                name = f"{name}_SE_r{red}" if red else f"{name}_SE"
+            elif att == 'cbam':
+                name = f"{name}_CBAM_r{red}" if red else f"{name}_CBAM"
 
         model_complexity["models"].append(name)
         model_complexity["flops"].append(flop)
@@ -54,10 +65,16 @@ if __name__ == "__main__":
     
     # Register model
     models = [ 
-        partial(mobilenetv3.MobileNetV3_Large, attention_type='se'), 
+        partial(mobilenetv3.MobileNetV3_Large, attention_type='se', reduction_ratio=4),
+        partial(mobilenetv3.MobileNetV3_Large, attention_type='none'),
+        partial(mobilenetv3.MobileNetV3_Large, attention_type='se', reduction_ratio=16),
+        partial(mobilenetv3.MobileNetV3_Large, attention_type='se', reduction_ratio=32),
         partial(mobilenetv3.MobileNetV3_Large, attention_type='cbam', reduction_ratio=16),
         partial(mobilenetv3.MobileNetV3_Large, attention_type='cbam', reduction_ratio=32),
-        partial(mobilenetv3.MobileNetV3_Small, attention_type='se'), 
+        partial(mobilenetv3.MobileNetV3_Small, attention_type='se', reduction_ratio=4),
+        partial(mobilenetv3.MobileNetV3_Small, attention_type='none'),
+        partial(mobilenetv3.MobileNetV3_Small, attention_type='se', reduction_ratio=16),
+        partial(mobilenetv3.MobileNetV3_Small, attention_type='se', reduction_ratio=32),
         partial(mobilenetv3.MobileNetV3_Small, attention_type='cbam', reduction_ratio=16),
         partial(mobilenetv3.MobileNetV3_Small, attention_type='cbam', reduction_ratio=32),
         get_mobilenet_v2,

@@ -74,8 +74,14 @@ def start_training(
 
     # Model selection using dictionary mapping
     model_map = {
-        "mobilenetv3_small": partial(MobileNetV3_Small, attention_type='se'),
-        "mobilenetv3_large": partial(MobileNetV3_Large, attention_type='se'),
+        "mobilenetv3_small": partial(MobileNetV3_Small, attention_type='se', reduction_ratio=4),
+        "mobilenetv3_large": partial(MobileNetV3_Large, attention_type='se', reduction_ratio=4),
+        "mobilenetv3_small_none": partial(MobileNetV3_Small, attention_type='none'),
+        "mobilenetv3_large_none": partial(MobileNetV3_Large, attention_type='none'),
+        "mobilenetv3_small_se_r16": partial(MobileNetV3_Small, attention_type='se', reduction_ratio=16),
+        "mobilenetv3_large_se_r16": partial(MobileNetV3_Large, attention_type='se', reduction_ratio=16),
+        "mobilenetv3_small_se_r32": partial(MobileNetV3_Small, attention_type='se', reduction_ratio=32),
+        "mobilenetv3_large_se_r32": partial(MobileNetV3_Large, attention_type='se', reduction_ratio=32),
         "proposed_large_16": partial(MobileNetV3_Large, attention_type='cbam', reduction_ratio=16),
         "proposed_large_32": partial(MobileNetV3_Large, attention_type='cbam', reduction_ratio=32),
         "proposed_small_16": partial(MobileNetV3_Small, attention_type='cbam', reduction_ratio=16),
@@ -133,6 +139,12 @@ if __name__ == "__main__":
         choices=[
             "mobilenetv3_small",
             "mobilenetv3_large",
+            "mobilenetv3_small_none",
+            "mobilenetv3_large_none",
+            "mobilenetv3_small_se_r16",
+            "mobilenetv3_large_se_r16",
+            "mobilenetv3_small_se_r32",
+            "mobilenetv3_large_se_r32",
             "proposed_large_16",
             "proposed_large_32",
             "proposed_small_16",
