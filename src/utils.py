@@ -1304,8 +1304,9 @@ def evaluate_model(
     all_preds, all_labels, all_probs = [], [], []
     total_loss = 0.0
 
-    # Create evaluation results directory
-    eval_dir = os.path.join(results_dir, "evaluation")
+    # Create evaluation results directory (per-model to avoid overwrites)
+    model_name = _get_model_display_name(model)
+    eval_dir = os.path.join(results_dir, "evaluation", model_name)
     os.makedirs(eval_dir, exist_ok=True)
 
     print("🔬 Running model evaluation...")
@@ -1384,7 +1385,7 @@ def evaluate_model(
         all_preds,
         all_probs,
         class_names,
-        model.__class__.__name__,
+        model_name,
         eval_dir,
         metrics,
         final_loss,
@@ -1399,7 +1400,7 @@ def evaluate_model(
         output_dict=True,
         zero_division=0,
     )
-    save_classification_report(report, model.__class__.__name__, eval_dir)
+    save_classification_report(report, model_name, eval_dir)
 
     end_time = time.time()
     total_time = end_time - start_time
