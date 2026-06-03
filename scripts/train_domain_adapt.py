@@ -143,19 +143,53 @@ def create_plantdoc_dataloaders_for_finetune(
     batch_size: int,
     seed: int,
 ):
-    """Create 70/15/15 split of PlantDoc for fine-tuning."""
+    """Create 70/15/15 split of PlantDoc for fine-tuning.
+
+    NOTE: PlantDoc has severe class imbalance (28 classes, 2,569 images). Several
+    classes contain only 1--5 samples. Stratified splitting is attempted; if any
+    class has <2 samples, the split falls back to unstratified random partition.
+    This is an inherent limitation of PlantDoc, not a methodology flaw. Per-class
+    metrics for under-represented classes should be interpreted cautiously.
+    """
     from src.data_setup import SubsetDataset
     base_dataset = datasets.ImageFolder(root=plantdoc_dir, transform=None)
     targets = np.array([s[1] for s in base_dataset.samples])
     indices = np.arange(len(base_dataset))
 
+    unique, counts = np.unique(targets, return_counts=True)
+    min_count = counts.min()
+    use_stratify = min_count >= 2
+
+    print(f"PlantDoc: {len(base_dataset)} images, {len(unique)} classes")
+    print(f"  Per-class range: {counts.min()}--{counts.max()} images, median={np.median(counts):.0f}")
+    if not use_stratify:
+        rare = [(base_dataset.classes[unique[i]], counts[i]) for i in np.where(counts < 2)[0]]
+        print(f"  Classes with <2 samples ({len(rare)}): {rare}")
+        print(f"  Using unstratified split (stratification requires >=2 samples per class)")
+
+    stratify_arg = targets if use_stratify else None
     train_idx, tmp_idx = train_test_split(
-        indices, test_size=0.3, stratify=targets, random_state=seed
+        indices, test_size=0.3, stratify=stratify_arg, random_state=seed
     )
     tmp_targets = targets[tmp_idx]
-    val_idx, test_idx = train_test_split(
-        tmp_idx, test_size=0.5, stratify=tmp_targets, random_state=seed
-    )
+
+    if use_stratify:
+        tmp_unique, tmp_counts = np.unique(tmp_targets, return_counts=True)
+        if tmp_counts.min() < 2:
+            print(f"  Second split: tmp subset has class with only {tmp_counts.min()} sample(s), skipping stratification")
+            val_idx, test_idx = train_test_split(
+                tmp_idx, test_size=0.5, stratify=None, random_state=seed
+            )
+        else:
+            val_idx, test_idx = train_test_split(
+                tmp_idx, test_size=0.5, stratify=tmp_targets, random_state=seed
+            )
+    else:
+        val_idx, test_idx = train_test_split(
+            tmp_idx, test_size=0.5, stratify=None, random_state=seed
+        )
+
+    print(f"  Split: train={len(train_idx)}, val={len(val_idx)}, test={len(test_idx)}")
 
     train_ds = SubsetDataset(Subset(base_dataset, train_idx.tolist()), test_transform)
     val_ds = SubsetDataset(Subset(base_dataset, val_idx.tolist()), test_transform)
