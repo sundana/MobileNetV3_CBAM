@@ -725,7 +725,9 @@ def create_model_comparison_dashboard(
         ax = fig.add_subplot(gs[1, 2 + i] if i < 2 else gs[2, i - 2])
 
         cm = confusion_matrix(pred_data["labels"], pred_data["predictions"])
-        cm_normalized = cm.astype("float") / cm.sum(axis=1)[:, np.newaxis]
+        row_sums = cm.sum(axis=1)[:, np.newaxis]
+        row_sums[row_sums == 0] = 1  # avoid divide-by-zero for classes absent from test set
+        cm_normalized = cm.astype("float") / row_sums
 
         sns.heatmap(
             cm_normalized,
@@ -1774,7 +1776,7 @@ def save_confusion_matrix(cm, class_names, model_name, results_dir):
     ax1.set_title("Raw Counts", fontweight="bold")
 
     # 2. Normalized confusion matrix (by true class)
-    cm_normalized = cm.astype("float") / cm.sum(axis=1)[:, np.newaxis]
+    cm_normalized = cm.astype("float") / np.maximum(cm.sum(axis=1)[:, np.newaxis], 1)
     sns.heatmap(
         cm_normalized,
         annot=True,

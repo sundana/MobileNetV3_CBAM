@@ -1,5 +1,15 @@
 import sys
 import os
+import warnings
+
+# Suppress visualization windows and noisy sklearn warnings
+import matplotlib
+matplotlib.use('Agg')
+warnings.filterwarnings('ignore', category=UserWarning)
+warnings.filterwarnings('ignore', message='.*Only one class.*')
+warnings.filterwarnings('ignore', message='.*No positive samples.*')
+warnings.filterwarnings('ignore', message='.*invalid value encountered.*')
+
 import torch
 
 # Fix Unicode emoji printing on Windows
